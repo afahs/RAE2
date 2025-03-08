@@ -632,3 +632,98 @@ def plotNormalizedOccultationHistograms(stats, use_std_weights=False, min_bin_pe
         print(f"Figure saved as {save_path}")
 
     plt.show()
+
+def plotNormalizedOccultationHistogramsPretty(stats, use_std_weights=False, min_bin_percentage=None, apply_filter=False, fig_label=None, save_path=None):
+    freqs = sorted(stats.keys())  # Sort frequencies in ascending order
+    num_freqs = len(freqs)
+    
+    # Ensure min_bin_percentage is a list of the correct length
+    if isinstance(min_bin_percentage, (int, float)):
+        min_bin_percentage = [min_bin_percentage] * num_freqs
+    elif len(min_bin_percentage) != num_freqs:
+        raise ValueError("min_bin_percentage must be a list of the same length as the number of frequencies")
+    
+    # Define grid size (3x3 or adjust if needed)
+    cols = 3
+    rows = (num_freqs // cols) + (num_freqs % cols > 0)
+    
+    fig, axes = plt.subplots(rows, cols, figsize=(15, 5 * rows))
+    axes = axes.flatten()  # Flatten in case we have fewer than 9 frequencies
+    
+    for i, (freq, min_bin) in enumerate(zip(freqs, min_bin_percentage)):
+        ax = axes[i]
+        
+        # Extract medians and stds for the frequency
+        occulted_medians = np.array(stats[freq]['occulted']['median'])
+        non_occulted_medians = np.array(stats[freq]['non_occulted']['median'])
+        
+        occulted_stds = np.array(stats[freq]['occulted']['std'])
+        non_occulted_stds = np.array(stats[freq]['non_occulted']['std'])
+        
+        # Remove top x% of the data if apply_filter is True
+        if apply_filter:
+            occ_threshold = np.percentile(occulted_medians, 100 * (1 - min_bin))
+            non_occ_threshold = np.percentile(non_occulted_medians, 100 * (1 - min_bin))
+            
+            mask_occ = occulted_medians <= occ_threshold
+            mask_non_occ = non_occulted_medians <= non_occ_threshold
+            
+            occulted_medians = occulted_medians[mask_occ]
+            non_occulted_medians = non_occulted_medians[mask_non_occ]
+            
+            if use_std_weights:
+                occulted_stds = occulted_stds[mask_occ]
+                non_occulted_stds = non_occulted_stds[mask_non_occ]
+        
+        # Compute weights (inverse of std, to give higher weight to more precise measurements)
+        if use_std_weights:
+            occulted_weights = 1 / (occulted_stds + 1e-6)  # Add small number to avoid division by zero
+            non_occulted_weights = 1 / (non_occulted_stds + 1e-6)
+        else:
+            occulted_weights = None
+            non_occulted_weights = None
+        
+        # Use shared binning for both datasets
+        combined_data = np.concatenate((occulted_medians, non_occulted_medians))
+        bins = np.histogram_bin_edges(combined_data, bins=40)
+        
+        occ_counts, _ = np.histogram(occulted_medians, bins=bins, weights=occulted_weights, density=True)
+        non_occ_counts, _ = np.histogram(non_occulted_medians, bins=bins, weights=non_occulted_weights, density=True)
+        
+        occ_bins_start = bins[:-1]
+        occ_bins_end = bins[1:]
+        non_occ_bins_start = bins[:-1]
+        non_occ_bins_end = bins[1:]
+        
+        # Normalize counts so max count is 1
+        if np.max(occ_counts) > 0:
+            occ_counts = occ_counts / np.max(occ_counts)
+        if np.max(non_occ_counts) > 0:
+            non_occ_counts = non_occ_counts / np.max(non_occ_counts)
+        
+        # Plot normalized histograms
+        ax.bar(occ_bins_start, occ_counts, width=occ_bins_end - occ_bins_start, alpha=0.6, label='Occulted', color='blue', align='edge')
+        ax.bar(non_occ_bins_start, non_occ_counts, width=non_occ_bins_end - non_occ_bins_start, alpha=0.6, label='Non-Occulted', color='orange', align='edge')
+        
+        # Labels
+        ax.set_title(f"Frequency {bandToFreq(freq)} MHz")
+        ax.set_xlabel("Median Signal Strength")
+        ax.set_ylabel("Normalized Count")
+        ax.legend()
+    
+    # Remove unused subplots
+    for j in range(i + 1, len(axes)):
+        fig.delaxes(axes[j])
+    
+    # Add figure label if provided
+    if fig_label:
+        fig.text(0.001, 0.98, fig_label, fontsize=20, verticalalignment='top', horizontalalignment='left')
+    
+    plt.tight_layout()
+    
+    # Save the figure if save_path is provided
+    if save_path:
+        plt.savefig(save_path, format='pdf', bbox_inches='tight')
+        print(f"Figure saved as {save_path}")
+    
+    plt.show()
