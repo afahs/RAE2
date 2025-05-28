@@ -1,4 +1,4 @@
-from astropy.coordinates.angle_utilities import angular_separation
+from astropy.coordinates import angular_separation
 from astropy.coordinates import SkyCoord, get_sun,FK4,get_body, EarthLocation
 from astropy.time import Time
 
@@ -13,7 +13,7 @@ import glob
 import numpy as np
 import astropy.units as u
 from scipy.interpolate import splrep,BSpline
-
+from matplotlib.ticker import MaxNLocator
 from tqdm.notebook import tqdm
 
 def bandToFreq(band):
@@ -393,7 +393,7 @@ def occultationStatistics(data, col='isVis', window=pd.Timedelta(minutes=10), pe
 # In[15]:
 
 
-def occultationStatisticsSigma(data, col='isVis', window=pd.Timedelta(minutes=10),n=5):
+def occultationStatisticsSigma(data, col='isVis', window=pd.Timedelta(minutes=10),n=5,antenn = 'rv1_coarse'):
     freqs = data['frequency_band'].unique()
     stats = {}
 
@@ -438,18 +438,18 @@ def occultationStatisticsSigma(data, col='isVis', window=pd.Timedelta(minutes=10
                 continue
 
             # Extract signal values
-            occultation_period_sig = sigmaClip(occultation_period['rv1_coarse'],n=n)
-            non_occult_sig = sigmaClip(non_occult['rv1_coarse'],n=n)  
+            occultation_period_sig = sigmaClip(occultation_period[antenn],n=n)
+            non_occult_sig = sigmaClip(non_occult[antenn],n=n)  
             
             if np.isnan(occultation_period_sig).any():
                 print('NaN detected in occultation period')
-                print(len(occultation_period['rv1_coarse']))
+                print(len(occultation_period[antenn]))
                 print(start)
                 print(end)
                 continue
             if np.isnan(non_occult_sig).any():
                 print('NaN detected in non-occulted period')
-                print(len(non_occult['rv1_coarse']))
+                print(len(non_occult[antenn]))
                 print(start)
                 print(end)
                 continue
@@ -633,97 +633,165 @@ def plotNormalizedOccultationHistograms(stats, use_std_weights=False, min_bin_pe
 
     plt.show()
 
-def plotNormalizedOccultationHistogramsPretty(stats, use_std_weights=False, min_bin_percentage=None, apply_filter=False, fig_label=None, save_path=None):
-    freqs = sorted(stats.keys())  # Sort frequencies in ascending order
+def plotNormalizedOccultationHistogramsPretty(
+        stats,
+        *,
+        use_std_weights=False,
+        min_bin_percentage=None,
+        apply_filter=False,
+        share_y=False,
+        palette=("tab:blue", "tab:orange"),
+        suptitle=None,
+        save_path=None,
+):
+    freqs = sorted(stats.keys())
     num_freqs = len(freqs)
-    
-    # Ensure min_bin_percentage is a list of the correct length
-    if isinstance(min_bin_percentage, (int, float)):
+
+    if isinstance(min_bin_percentage, (int, float)) or min_bin_percentage is None:
         min_bin_percentage = [min_bin_percentage] * num_freqs
     elif len(min_bin_percentage) != num_freqs:
-        raise ValueError("min_bin_percentage must be a list of the same length as the number of frequencies")
-    
-    # Define grid size (3x3 or adjust if needed)
-    cols = 3
-    rows = (num_freqs // cols) + (num_freqs % cols > 0)
-    
-    fig, axes = plt.subplots(rows, cols, figsize=(15, 5 * rows))
-    axes = axes.flatten()  # Flatten in case we have fewer than 9 frequencies
-    
-    for i, (freq, min_bin) in enumerate(zip(freqs, min_bin_percentage)):
+        raise ValueError("min_bin_percentage must have one entry per frequency")
+
+    cols, rows = 3, (num_freqs + 2) // 3
+    fig, axes = plt.subplots(rows, cols, figsize=(14, 4.5 * rows),
+                             sharey=share_y, constrained_layout=True)
+    axes = axes.flatten()
+
+    for i, (freq, pct) in enumerate(zip(freqs, min_bin_percentage)):
         ax = axes[i]
-        
-        # Extract medians and stds for the frequency
-        occulted_medians = np.array(stats[freq]['occulted']['median'])
-        non_occulted_medians = np.array(stats[freq]['non_occulted']['median'])
-        
-        occulted_stds = np.array(stats[freq]['occulted']['std'])
-        non_occulted_stds = np.array(stats[freq]['non_occulted']['std'])
-        
-        # Remove top x% of the data if apply_filter is True
-        if apply_filter:
-            occ_threshold = np.percentile(occulted_medians, 100 * (1 - min_bin))
-            non_occ_threshold = np.percentile(non_occulted_medians, 100 * (1 - min_bin))
-            
-            mask_occ = occulted_medians <= occ_threshold
-            mask_non_occ = non_occulted_medians <= non_occ_threshold
-            
-            occulted_medians = occulted_medians[mask_occ]
-            non_occulted_medians = non_occulted_medians[mask_non_occ]
-            
-            if use_std_weights:
-                occulted_stds = occulted_stds[mask_occ]
-                non_occulted_stds = non_occulted_stds[mask_non_occ]
-        
-        # Compute weights (inverse of std, to give higher weight to more precise measurements)
-        if use_std_weights:
-            occulted_weights = 1 / (occulted_stds + 1e-6)  # Add small number to avoid division by zero
-            non_occulted_weights = 1 / (non_occulted_stds + 1e-6)
-        else:
-            occulted_weights = None
-            non_occulted_weights = None
-        
-        # Use shared binning for both datasets
-        combined_data = np.concatenate((occulted_medians, non_occulted_medians))
-        bins = np.histogram_bin_edges(combined_data, bins=40)
-        
-        occ_counts, _ = np.histogram(occulted_medians, bins=bins, weights=occulted_weights, density=True)
-        non_occ_counts, _ = np.histogram(non_occulted_medians, bins=bins, weights=non_occulted_weights, density=True)
-        
-        occ_bins_start = bins[:-1]
-        occ_bins_end = bins[1:]
-        non_occ_bins_start = bins[:-1]
-        non_occ_bins_end = bins[1:]
-        
-        # Normalize counts so max count is 1
-        if np.max(occ_counts) > 0:
-            occ_counts = occ_counts / np.max(occ_counts)
-        if np.max(non_occ_counts) > 0:
-            non_occ_counts = non_occ_counts / np.max(non_occ_counts)
-        
-        # Plot normalized histograms
-        ax.bar(occ_bins_start, occ_counts, width=occ_bins_end - occ_bins_start, alpha=0.6, label='Occulted', color='blue', align='edge')
-        ax.bar(non_occ_bins_start, non_occ_counts, width=non_occ_bins_end - non_occ_bins_start, alpha=0.6, label='Non-Occulted', color='orange', align='edge')
-        
-        # Labels
-        ax.set_title(f"Frequency {bandToFreq(freq)} MHz")
-        ax.set_xlabel("Median Signal Strength")
-        ax.set_ylabel("Normalized Count")
-        ax.legend()
-    
-    # Remove unused subplots
+
+        occ_med  = np.asarray(stats[freq]["occulted"]["median"])
+        nocc_med = np.asarray(stats[freq]["non_occulted"]["median"])
+        occ_std  = np.asarray(stats[freq]["occulted"]["std"])
+        nocc_std = np.asarray(stats[freq]["non_occulted"]["std"])
+
+        if apply_filter and pct is not None:
+            thr_occ  = np.percentile(occ_med,  100 * (1 - pct))
+            thr_nocc = np.percentile(nocc_med, 100 * (1 - pct))
+            keep_occ  = occ_med  <= thr_occ
+            keep_nocc = nocc_med <= thr_nocc
+            occ_med,  occ_std  = occ_med[keep_occ],  occ_std[keep_occ]
+            nocc_med, nocc_std = nocc_med[keep_nocc], nocc_std[keep_nocc]
+
+        occ_w  = 1 / (occ_std  + 1e-9) if use_std_weights else None
+        nocc_w = 1 / (nocc_std + 1e-9) if use_std_weights else None
+
+        bins = np.histogram_bin_edges(np.concatenate([occ_med, nocc_med]), bins=40)
+        occ_cnt, _  = np.histogram(occ_med,  bins=bins, weights=occ_w,  density=True)
+        nocc_cnt, _ = np.histogram(nocc_med, bins=bins, weights=nocc_w, density=True)
+        occ_cnt  /= occ_cnt.max()  if occ_cnt.max()  > 0 else 1
+        nocc_cnt /= nocc_cnt.max() if nocc_cnt.max() > 0 else 1
+
+        width = np.diff(bins)
+        ax.bar(bins[:-1], occ_cnt,  width=width, align="edge",
+               alpha=0.65, color=palette[0], edgecolor="black", label="Occulted")
+        ax.bar(bins[:-1], nocc_cnt, width=width, align="edge",
+               alpha=0.65, color=palette[1], edgecolor="black", label="Non‑Occulted")
+
+        # ---------- cosmetics ------------------------------------
+        ax.set_title(f"{bandToFreq(freq)} MHz")
+        ax.set_xlabel("Median signal")
+        if not share_y or i % cols == 0:
+            ax.set_ylabel("Normalized count")
+        ax.set_yticks(np.linspace(0, 1, 6))
+
+        # --- force scientific notation on x‑axis, hide offset ----
+        ax.ticklabel_format(axis='x', style='sci', scilimits=(0, 0), useMathText=True)
+        ax.xaxis.get_offset_text().set_visible(False)
+
+        ax.legend(frameon=False, fontsize=9)
+
     for j in range(i + 1, len(axes)):
         fig.delaxes(axes[j])
-    
-    # Add figure label if provided
-    if fig_label:
-        fig.text(0.001, 0.98, fig_label, fontsize=20, verticalalignment='top', horizontalalignment='left')
-    
-    plt.tight_layout()
-    
-    # Save the figure if save_path is provided
+
+    if suptitle:
+        fig.suptitle(suptitle, fontsize=16, y=1.02)
+
     if save_path:
-        plt.savefig(save_path, format='pdf', bbox_inches='tight')
-        print(f"Figure saved as {save_path}")
-    
+        fig.savefig(save_path, bbox_inches="tight")
+        print(f"Saved → {save_path}")
+
+    plt.show()
+def plotOccultationHistogramSingle(
+        stats_for_freq,
+        *,
+        freq_key,
+        use_std_weights=False,
+        min_bin_percentage=None,
+        apply_filter=False,
+        palette=("tab:blue", "tab:orange"),
+        title=None,
+        save_path=None,
+):
+    """
+    Parameters
+    ----------
+    stats_for_freq : dict
+        stats[freq_key] slice – must contain
+        ["occulted"]["median"|"std"] and ["non_occulted"][...]
+    freq_key : any
+        Used only for the title (e.g. 8 or "8")
+    use_std_weights : bool, optional
+        Weight by 1/σ if True.
+    min_bin_percentage : float or None, optional
+        If e.g. 0.02, drop the top 2 % of values (largest medians).
+    apply_filter : bool, optional
+        Whether to apply the threshold cut.
+    palette : tuple(str,str), optional
+        Colors for (occulted, non‑occulted).
+    title : str or None, optional
+        Override panel title.  Default is "freq_key MHz".
+    save_path : str or Path or None
+        If given, writes figure to disk.
+    """
+
+    # ---------- unpack data ---------------------------------------------------
+    occ_med  = np.asarray(stats_for_freq["occulted"]["median"])
+    nocc_med = np.asarray(stats_for_freq["non_occulted"]["median"])
+    occ_std  = np.asarray(stats_for_freq["occulted"]["std"])
+    nocc_std = np.asarray(stats_for_freq["non_occulted"]["std"])
+
+    # ---------- optional tail trimming ---------------------------------------
+    if apply_filter and min_bin_percentage is not None:
+        thr_occ  = np.percentile(occ_med,  100 * (1 - min_bin_percentage))
+        thr_nocc = np.percentile(nocc_med, 100 * (1 - min_bin_percentage))
+        occ_mask  = occ_med  <= thr_occ
+        nocc_mask = nocc_med <= thr_nocc
+        occ_med,  occ_std  = occ_med[occ_mask],  occ_std[occ_mask]
+        nocc_med, nocc_std = nocc_med[nocc_mask], nocc_std[nocc_mask]
+
+    # ---------- weights -------------------------------------------------------
+    occ_w  = 1 / (occ_std  + 1e-9) if use_std_weights else None
+    nocc_w = 1 / (nocc_std + 1e-9) if use_std_weights else None
+
+    # ---------- shared bins, normalized counts -------------------------------
+    bins = np.histogram_bin_edges(np.concatenate([occ_med, nocc_med]), bins=40)
+    occ_cnt, _  = np.histogram(occ_med,  bins=bins, weights=occ_w,  density=True)
+    nocc_cnt, _ = np.histogram(nocc_med, bins=bins, weights=nocc_w, density=True)
+    occ_cnt  /= occ_cnt.max()  if occ_cnt.max()  > 0 else 1
+    nocc_cnt /= nocc_cnt.max() if nocc_cnt.max() > 0 else 1
+
+    # ---------- plotting ------------------------------------------------------
+    fig, ax = plt.subplots(figsize=(6.5, 4.5), constrained_layout=True)
+    width = np.diff(bins)
+    ax.bar(bins[:-1], occ_cnt,  width=width, align="edge",
+           alpha=0.65, color=palette[0], edgecolor="black", label="Occulted")
+    ax.bar(bins[:-1], nocc_cnt, width=width, align="edge",
+           alpha=0.65, color=palette[1], edgecolor="black", label="Non‑Occulted")
+
+    ax.set_xlabel("Median signal")
+    ax.set_ylabel("Normalized count")
+    ax.set_title(title or f"{freq_key} MHz")
+    ax.set_yticks(np.linspace(0, 1, 6))
+
+    # scientific notation on x‑axis, no offset text
+    ax.ticklabel_format(axis='x', style='sci', scilimits=(0, 0), useMathText=True)
+    ax.xaxis.get_offset_text().set_visible(False)
+
+    ax.legend(frameon=False)
+
+    if save_path:
+        fig.savefig(save_path, bbox_inches="tight")
+        print(f"Saved → {save_path}")
+
     plt.show()
