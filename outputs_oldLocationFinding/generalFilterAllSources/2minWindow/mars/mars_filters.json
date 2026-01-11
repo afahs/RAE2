@@ -1,8 +1,0 @@
-{
-  "total_pairs": 1419,
-  "guard_filtered_pairs": 795,
-  "usable_pairs": 624,
-  "freq_pair_attempts": 5616,
-  "missing_data_events": 3805,
-  "filtered_candidates": 4600
-}
