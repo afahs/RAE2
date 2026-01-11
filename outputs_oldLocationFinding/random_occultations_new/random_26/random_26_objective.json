@@ -1,0 +1,144 @@
+{
+  "rows": [
+    {
+      "freq": 0.45,
+      "freq_label": "0.45",
+      "freq_band": 1.0,
+      "ingress": {
+        "metric": -0.8959192046799013,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "egress": {
+        "metric": 1.0828887217535643,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "combined": {
+        "metric": 0.18696951707366305,
+        "stderr": 0.9894039632167329,
+        "n_used": 2
+      }
+    },
+    {
+      "freq": 0.7,
+      "freq_label": "0.7",
+      "freq_band": 2.0,
+      "ingress": {
+        "metric": 1.4786194614208845,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "egress": {
+        "metric": -3.1284536047646694,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "combined": {
+        "metric": -1.6498341433437849,
+        "stderr": 2.303536533092777,
+        "n_used": 2
+      }
+    },
+    {
+      "freq": 2.2,
+      "freq_label": "2.2",
+      "freq_band": 5.0,
+      "ingress": {
+        "metric": 0.0,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "egress": {
+        "metric": 0.0,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "combined": {
+        "metric": 0.0,
+        "stderr": 0.0,
+        "n_used": 2
+      }
+    },
+    {
+      "freq": 3.93,
+      "freq_label": "3.93",
+      "freq_band": 6.0,
+      "ingress": {
+        "metric": 0.1683298792007517,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "egress": {
+        "metric": -0.32923528259238666,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "combined": {
+        "metric": -0.16090540339163495,
+        "stderr": 0.24878258089656918,
+        "n_used": 2
+      }
+    },
+    {
+      "freq": 4.7,
+      "freq_label": "4.7",
+      "freq_band": 7.0,
+      "ingress": {
+        "metric": -0.7173075937720538,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "egress": {
+        "metric": 1.30921090177308,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "combined": {
+        "metric": 0.5919033080010262,
+        "stderr": 1.0132592477725668,
+        "n_used": 2
+      }
+    },
+    {
+      "freq": 6.55,
+      "freq_label": "6.55",
+      "freq_band": 8.0,
+      "ingress": {
+        "metric": -0.009081139592691464,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "egress": {
+        "metric": 1.5081836093572005,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "combined": {
+        "metric": 1.499102469764509,
+        "stderr": 0.7586323744749459,
+        "n_used": 2
+      }
+    },
+    {
+      "freq": 9.18,
+      "freq_label": "9.18",
+      "freq_band": 9.0,
+      "ingress": {
+        "metric": -4.876006318128914e-06,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "egress": {
+        "metric": 3.928407579097987e-06,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "combined": {
+        "metric": -9.475987390309267e-07,
+        "stderr": 4.402206948613451e-06,
+        "n_used": 2
+      }
+    }
+  ]
+}

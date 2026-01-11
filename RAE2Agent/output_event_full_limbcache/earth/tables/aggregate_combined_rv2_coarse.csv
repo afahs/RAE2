@@ -1,0 +1,2 @@
+frequency_band,event_type,n_events,combined_z,mean_z,target,data_col,analysis_mode
+all,Ingress,676,0.11653243598268759,0.004482016768564907,Earth,rv2_coarse,combined

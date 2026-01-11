@@ -1,0 +1,3 @@
+frequency_band,event_type,n_events,combined_z,mean_z,target,data_col,analysis_mode
+all,Egress,184,2.3757805469711584,0.17514486562008952,Cygnus-A,rv2_coarse,combined
+all,Ingress,691,1.280574172775958,0.04871533740394662,Cygnus-A,rv2_coarse,combined

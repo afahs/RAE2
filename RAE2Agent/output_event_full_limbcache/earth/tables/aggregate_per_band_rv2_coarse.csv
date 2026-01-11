@@ -1,0 +1,10 @@
+frequency_band,event_type,n_events,combined_z,mean_z,target,data_col,analysis_mode
+1,Ingress,645,-12.897895307510455,-0.5078541317821658,Earth,rv2_coarse,per_band
+2,Ingress,647,-8.582925579025378,-0.3374296228531321,Earth,rv2_coarse,per_band
+3,Ingress,645,-4.927671334381842,-0.19402686931201302,Earth,rv2_coarse,per_band
+4,Ingress,649,5.861685272317296,0.23009127361480897,Earth,rv2_coarse,per_band
+5,Ingress,657,6.324098140617831,0.24672656711960908,Earth,rv2_coarse,per_band
+6,Ingress,659,1.8326883385970592,0.07139140172604247,Earth,rv2_coarse,per_band
+7,Ingress,651,4.384802963253305,0.17185397753710133,Earth,rv2_coarse,per_band
+8,Ingress,645,-4.869663819030881,-0.19174282562557926,Earth,rv2_coarse,per_band
+9,Ingress,639,-8.14865749058461,-0.3223559082909922,Earth,rv2_coarse,per_band

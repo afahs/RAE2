@@ -1,0 +1,3 @@
+event_type,pre_event_time,post_event_time,frequency_band,pre_median,post_median,dip_z_score,ttest_pvalue,target,data_col,analysis_mode
+Ingress,1974-09-10 00:00:03.047,1974-09-10 00:00:04.972,all,1040301.90625,932436.9375,0.2037339673011913,0.3853687022518043,Fornax-A,rv2_coarse,combined
+Ingress,1974-09-13 23:59:56.377,1974-09-13 23:59:58.302,all,808550.0,2836490.0,-1.4561327827886292,0.0019985339049976725,Fornax-A,rv2_coarse,combined

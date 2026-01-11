@@ -1,0 +1,3 @@
+frequency_band,event_type,n_events,combined_z,mean_z,target,data_col,analysis_mode
+all,Egress,9,1.308947185357021,0.4363157284523403,Sag-A,rv2_coarse,combined
+all,Ingress,7,0.5486555980028167,0.20737232396269706,Sag-A,rv2_coarse,combined

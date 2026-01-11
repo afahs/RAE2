@@ -1,0 +1,3 @@
+frequency_band,event_type,n_events,combined_z,mean_z,target,data_col,analysis_mode
+all,Egress,1000,-5.196610811964951,-0.16433126279266227,Neptune,rv2_coarse,combined
+all,Ingress,1218,-1.707493412001466,-0.04892551350721325,Neptune,rv2_coarse,combined

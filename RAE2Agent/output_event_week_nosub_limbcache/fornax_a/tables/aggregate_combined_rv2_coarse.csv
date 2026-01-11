@@ -1,0 +1,3 @@
+frequency_band,event_type,n_events,combined_z,mean_z,target,data_col,analysis_mode
+all,Egress,32,-0.954487708482396,-0.16873118280677768,Fornax-A,rv2_coarse,combined
+all,Ingress,34,1.0134912421283553,0.17381231407933678,Fornax-A,rv2_coarse,combined

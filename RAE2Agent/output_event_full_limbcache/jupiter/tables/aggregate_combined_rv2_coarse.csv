@@ -1,0 +1,3 @@
+frequency_band,event_type,n_events,combined_z,mean_z,target,data_col,analysis_mode
+all,Egress,317,-1.5123170222564997,-0.08494018633668599,Jupiter,rv2_coarse,combined
+all,Ingress,540,-0.08154992047270583,-0.0035093498208369884,Jupiter,rv2_coarse,combined

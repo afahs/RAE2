@@ -1,0 +1,3 @@
+frequency_band,event_type,n_events,combined_z,mean_z,target,data_col,analysis_mode
+all,Egress,227,-1.0236742273401376,-0.06794364481697387,Uranus,rv2_coarse,combined
+all,Ingress,683,3.025212689947647,0.11575654653841888,Uranus,rv2_coarse,combined

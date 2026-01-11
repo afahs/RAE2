@@ -1,0 +1,3 @@
+frequency_band,event_type,n_events,combined_z,mean_z,target,data_col,analysis_mode
+all,Egress,554,-2.3452706494918623,-0.09964100198631842,Mars,rv2_coarse,combined
+all,Ingress,788,-1.2593614899912056,-0.04486289551512589,Mars,rv2_coarse,combined

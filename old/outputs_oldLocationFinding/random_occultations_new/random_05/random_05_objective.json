@@ -1,0 +1,184 @@
+{
+  "rows": [
+    {
+      "freq": 0.45,
+      "freq_label": "0.45",
+      "freq_band": 1.0,
+      "ingress": {
+        "metric": -1.4783564521528736,
+        "stderr": 0.6394148890129976,
+        "n_used": 5
+      },
+      "egress": {
+        "metric": -1.8911393641904737,
+        "stderr": 1.7434221756496597,
+        "n_used": 5
+      },
+      "combined": {
+        "metric": -3.3694958163433473,
+        "stderr": 1.9735130843537954,
+        "n_used": 10
+      }
+    },
+    {
+      "freq": 0.7,
+      "freq_label": "0.7",
+      "freq_band": 2.0,
+      "ingress": {
+        "metric": -2.088124160031148,
+        "stderr": 0.9936830409228632,
+        "n_used": 6
+      },
+      "egress": {
+        "metric": 2.183057056485611,
+        "stderr": 1.0138723898450734,
+        "n_used": 6
+      },
+      "combined": {
+        "metric": 0.09493289645446323,
+        "stderr": 1.9001155723017293,
+        "n_used": 12
+      }
+    },
+    {
+      "freq": 0.9,
+      "freq_label": "0.9",
+      "freq_band": 3.0,
+      "ingress": {
+        "metric": -3.7191569673394413,
+        "stderr": 1.967915326902308,
+        "n_used": 6
+      },
+      "egress": {
+        "metric": 0.28207043717542285,
+        "stderr": 1.4222312672503827,
+        "n_used": 6
+      },
+      "combined": {
+        "metric": -3.4370865301640188,
+        "stderr": 2.7763191784055428,
+        "n_used": 12
+      }
+    },
+    {
+      "freq": 1.31,
+      "freq_label": "1.31",
+      "freq_band": 4.0,
+      "ingress": {
+        "metric": -3.569623291107549,
+        "stderr": 1.4922396018114055,
+        "n_used": 7
+      },
+      "egress": {
+        "metric": 0.9923623611156988,
+        "stderr": 1.3942707070797145,
+        "n_used": 7
+      },
+      "combined": {
+        "metric": -2.5772609299918505,
+        "stderr": 2.428724503125846,
+        "n_used": 14
+      }
+    },
+    {
+      "freq": 2.2,
+      "freq_label": "2.2",
+      "freq_band": 5.0,
+      "ingress": {
+        "metric": -2.59768964674793,
+        "stderr": 1.4632706806239977,
+        "n_used": 7
+      },
+      "egress": {
+        "metric": 0.659254500821595,
+        "stderr": 1.0188678696026727,
+        "n_used": 7
+      },
+      "combined": {
+        "metric": -1.938435145926335,
+        "stderr": 2.036605389211356,
+        "n_used": 14
+      }
+    },
+    {
+      "freq": 3.93,
+      "freq_label": "3.93",
+      "freq_band": 6.0,
+      "ingress": {
+        "metric": 3.340078403454707,
+        "stderr": 1.3651554688724024,
+        "n_used": 7
+      },
+      "egress": {
+        "metric": -4.063151383703552,
+        "stderr": 1.8337169224143863,
+        "n_used": 7
+      },
+      "combined": {
+        "metric": -0.7230729802488454,
+        "stderr": 3.049080699539332,
+        "n_used": 14
+      }
+    },
+    {
+      "freq": 4.7,
+      "freq_label": "4.7",
+      "freq_band": 7.0,
+      "ingress": {
+        "metric": -1.7265393578368027,
+        "stderr": 1.6335406948047324,
+        "n_used": 8
+      },
+      "egress": {
+        "metric": -1.9169705553187968,
+        "stderr": 1.6773492359039472,
+        "n_used": 8
+      },
+      "combined": {
+        "metric": -3.6435099131556,
+        "stderr": 2.4239737557170766,
+        "n_used": 16
+      }
+    },
+    {
+      "freq": 6.55,
+      "freq_label": "6.55",
+      "freq_band": 8.0,
+      "ingress": {
+        "metric": -3.4834179106257994,
+        "stderr": 3.5582000333326933,
+        "n_used": 9
+      },
+      "egress": {
+        "metric": -1.2658605487546255,
+        "stderr": 1.7463897072619228,
+        "n_used": 9
+      },
+      "combined": {
+        "metric": -4.749278459380426,
+        "stderr": 4.117110780024708,
+        "n_used": 18
+      }
+    },
+    {
+      "freq": 9.18,
+      "freq_label": "9.18",
+      "freq_band": 9.0,
+      "ingress": {
+        "metric": -1.7302784141785357,
+        "stderr": 1.7148229114367308,
+        "n_used": 6
+      },
+      "egress": {
+        "metric": -0.38619051858520703,
+        "stderr": 2.476089785122433,
+        "n_used": 6
+      },
+      "combined": {
+        "metric": -2.1164689327637434,
+        "stderr": 3.1806923954099866,
+        "n_used": 12
+      }
+    }
+  ]
+}

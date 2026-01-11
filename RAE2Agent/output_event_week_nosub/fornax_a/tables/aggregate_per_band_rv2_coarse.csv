@@ -1,0 +1,10 @@
+frequency_band,event_type,n_events,combined_z,mean_z,target,data_col,analysis_mode
+1,Ingress,2,-19.545876185950434,-13.821021595318204,Fornax-A,rv2_coarse,per_band
+2,Ingress,1,-8.795638253351653,-8.795638253351653,Fornax-A,rv2_coarse,per_band
+3,Ingress,1,-10.393024482638872,-10.393024482638872,Fornax-A,rv2_coarse,per_band
+4,Ingress,1,21.93444500683064,21.93444500683064,Fornax-A,rv2_coarse,per_band
+5,Ingress,2,8.59338941729448,6.076443930345642,Fornax-A,rv2_coarse,per_band
+6,Ingress,2,3.693227642882608,2.611506310747901,Fornax-A,rv2_coarse,per_band
+7,Ingress,2,4.357768715233969,3.0814078093845287,Fornax-A,rv2_coarse,per_band
+8,Ingress,2,-2.2213959164408257,-1.5707641162154133,Fornax-A,rv2_coarse,per_band
+9,Ingress,2,-6.698119908686761,-4.736286008633027,Fornax-A,rv2_coarse,per_band

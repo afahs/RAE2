@@ -1,0 +1,184 @@
+{
+  "rows": [
+    {
+      "freq": 0.45,
+      "freq_label": 0.45,
+      "freq_band": 1.0,
+      "ingress": {
+        "metric": 1.5381917965445306,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "egress": {
+        "metric": 0.29671446863134787,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "combined": {
+        "metric": 1.8349062651758785,
+        "stderr": 0.6207386639565914,
+        "n_used": 2
+      }
+    },
+    {
+      "freq": 0.7,
+      "freq_label": 0.7,
+      "freq_band": 2.0,
+      "ingress": {
+        "metric": -1.3533717827968668,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "egress": {
+        "metric": 0.0,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "combined": {
+        "metric": -1.3533717827968668,
+        "stderr": 0.6766858913984334,
+        "n_used": 2
+      }
+    },
+    {
+      "freq": 0.9,
+      "freq_label": 0.9,
+      "freq_band": 3.0,
+      "ingress": {
+        "metric": 2.695620064429529,
+        "stderr": 2.368652872127165,
+        "n_used": 3
+      },
+      "egress": {
+        "metric": -1.5798977916995134,
+        "stderr": 2.279070122453499,
+        "n_used": 3
+      },
+      "combined": {
+        "metric": 1.1157222727300158,
+        "stderr": 4.005588915006176,
+        "n_used": 6
+      }
+    },
+    {
+      "freq": 1.31,
+      "freq_label": 1.31,
+      "freq_band": 4.0,
+      "ingress": {
+        "metric": 1.755253419169853,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "egress": {
+        "metric": -1.3668951625767027,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "combined": {
+        "metric": 0.38835825659315026,
+        "stderr": 1.561074290873278,
+        "n_used": 2
+      }
+    },
+    {
+      "freq": 2.2,
+      "freq_label": 2.2,
+      "freq_band": 5.0,
+      "ingress": {
+        "metric": -0.8542319132481666,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "egress": {
+        "metric": 0.20673666905430993,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "combined": {
+        "metric": -0.6474952441938566,
+        "stderr": 0.5304842911512383,
+        "n_used": 2
+      }
+    },
+    {
+      "freq": 3.93,
+      "freq_label": 3.93,
+      "freq_band": 6.0,
+      "ingress": {
+        "metric": 1.064511715812524,
+        "stderr": 1.241158013956663,
+        "n_used": 3
+      },
+      "egress": {
+        "metric": 1.02773340992448,
+        "stderr": 0.68515560661632,
+        "n_used": 3
+      },
+      "combined": {
+        "metric": 2.092245125737004,
+        "stderr": 1.5851110823221517,
+        "n_used": 6
+      }
+    },
+    {
+      "freq": 4.7,
+      "freq_label": 4.7,
+      "freq_band": 7.0,
+      "ingress": {
+        "metric": 1.3046713110265562,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "egress": {
+        "metric": -0.5755307183643125,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "combined": {
+        "metric": 0.7291405926622437,
+        "stderr": 0.9401010146954343,
+        "n_used": 2
+      }
+    },
+    {
+      "freq": 6.55,
+      "freq_label": 6.55,
+      "freq_band": 8.0,
+      "ingress": {
+        "metric": -1.6144826123520217,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "egress": {
+        "metric": -14.056863878544974,
+        "stderr": NaN,
+        "n_used": 1
+      },
+      "combined": {
+        "metric": -15.671346490896996,
+        "stderr": 6.221190633096476,
+        "n_used": 2
+      }
+    },
+    {
+      "freq": 9.18,
+      "freq_label": 9.18,
+      "freq_band": 9.0,
+      "ingress": {
+        "metric": -2.582870820160206,
+        "stderr": 2.4088897680481685,
+        "n_used": 3
+      },
+      "egress": {
+        "metric": -6.345235961906216,
+        "stderr": 1.3564476503218248,
+        "n_used": 3
+      },
+      "combined": {
+        "metric": -8.928106782066422,
+        "stderr": 3.3940244209464474,
+        "n_used": 6
+      }
+    }
+  ]
+}

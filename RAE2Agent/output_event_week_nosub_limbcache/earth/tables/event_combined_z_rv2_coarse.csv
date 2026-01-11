@@ -1,0 +1,10 @@
+frequency_band,frequency_mhz,n_events,combined_z,mean_z,target,data_col,kind
+1,0.45,1,-9.153337348407403,-9.153337348407403,Earth,rv2_coarse,earth
+2,0.7,0,,,Earth,rv2_coarse,earth
+3,0.9,0,,,Earth,rv2_coarse,earth
+4,1.31,0,,,Earth,rv2_coarse,earth
+5,2.2,1,12.56487001787383,12.56487001787383,Earth,rv2_coarse,earth
+6,3.93,1,6.151484391337748,6.151484391337748,Earth,rv2_coarse,earth
+7,4.7,1,6.594372550543361,6.594372550543361,Earth,rv2_coarse,earth
+8,6.55,1,-1.298806816046046,-1.298806816046046,Earth,rv2_coarse,earth
+9,9.18,1,-6.4855676022874915,-6.4855676022874915,Earth,rv2_coarse,earth

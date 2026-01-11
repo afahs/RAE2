@@ -1,0 +1,123 @@
+Summary of prior attempts (chronological)
+- Initial notebook/event-window occultation pipeline (fornaxPipeline.ipynb): no convincing detection; event-based stats were noisy and did not separate sources from noise.
+- Global blocked-vs-visible aggregate (RAE2Agent/occultation_search.py) with random-sky baseline:
+  - Added random sky targets and per-band/combined z-score tables; z-scores could be large but random-sky z distribution was not N(0,1).
+  - Random sky z-scores showed strong positive bias and heavy tails (many |z| > 3), so random-percentile comparisons often were not extreme.
+  - With limb filtering on, large z for some sources/planets did not uniquely stand out vs random sky.
+- Diagnostic variants:
+  - No-limb filter: random distribution remained biased; limb filtering was not the main cause.
+  - 30-min downsample: extremely unstable z-scores due to very small blocked counts.
+- Plotting updates:
+  - Split random-vs-real plots into planets and non-planets with unique colors per source.
+  - Added per-source random_percentile vs frequency plots.
+
+New diagnostics requested (rv2_coarse only, no beam pointing)
+
+Step 1: 5-minute downsample to reduce time correlation
+Run: --downsample-minutes 5 --random-sky 500
+Output: RAE2Agent/output_search_downsample5_perm/
+Result:
+- Random-sky z distribution became narrower but still biased positive (mean ~1.19, median ~1.11, std ~2.16). Not centered at 0.
+Meaning:
+- Downsampling reduces correlation but does not make the null Gaussian N(0,1). Background/selection effects still dominate.
+
+Step 2: Permutation null tests (shuffle blocked/visible within time windows)
+Runs:
+- 60-min window, 10 reps: RAE2Agent/output_search_downsample5_perm/
+- 60-min window, 50 reps: RAE2Agent/output_search_downsample5_perm50/
+- 30-min window, 20 reps: RAE2Agent/output_search_downsample5_perm_win30/
+- 120-min window, 20 reps: RAE2Agent/output_search_downsample5_perm_win120/
+Results (perm_percentile; low bands 0.45-1.31 MHz vs high bands >=2.20 MHz):
+- All-sources median perm_percentile stays near 0.55-0.70 for both low and high bands, i.e., broadly consistent with a random-like null.
+- Cygnus-A: low-band median perm_percentile ranges 0.20 to 0.70 across windows; high-band median 0.40 to 0.60. This instability suggests time-structured systematics dominate over a stable occultation signal.
+- Sag-A: low-band median 0.15 to 0.35; high-band median 0.30 to 0.50. High bands look random-like, consistent with the expectation above ~2 MHz.
+- Fornax-A: low-band median 0.75 to 0.90; high-band median 0.62 to 0.80. These elevated percentiles are not stable across window choices and may reflect background selection effects rather than a clean occultation signal.
+- Jupiter: low-band median ~1.00 in all windows; high-band median 0.70 to 0.93. The consistently high low-band percentile could be a real effect, but high-band elevation is harder to reconcile with the "moon edge" expectation and may be systematic.
+Meaning:
+- Permutation tests (which preserve time structure) do not show robust, consistent high-percentile detections across bands. High-band behavior for Cygnus-A and Sag-A looks closer to random, which matches the expectation above ~2 MHz.
+- Low-band signals are not stable with respect to shuffle window size; this undermines confidence in a firm detection without further controls.
+
+Current status
+- The downsample + permutation diagnostics suggest the previous high z-scores largely reflect non-zero sky/background and time-structured systematics.
+- Above ~2 MHz, results for some sources appear closer to random, as expected, but not uniformly for all sources or planets.
+
+Outputs to inspect
+- RAE2Agent/output_search_downsample5_perm*/permutation_comparison_per_band_rv2_coarse.csv
+- RAE2Agent/output_search_downsample5_perm*/random_per_band_rv2_coarse.csv
+- RAE2Agent/output_search_downsample5_perm*/plots/rv2_coarse/random_percentile_<target>.png
+
+Event-based approach revived (ingress/egress windows)
+- Changes made:
+  - Added random-sky baselines (configurable with --random-sky/--random-seed) for event-based analysis.
+  - Added per-band combined event z-scores and random-percentile summaries.
+  - Added per-source random-percentile vs frequency plots for the event-based pipeline.
+  - Added min-sample threshold (--min-samples) to reduce unstable event z-scores from tiny windows.
+  - Added optional planet ephemeris grid (--planet-step-minutes) and --no-planets for speed.
+  - Optimized CSV loading to read only required columns.
+
+Attempted runs (rv2_coarse only, no beam pointing)
+- Full event-based run with random sky (100-200) and no planets timed out after 20 minutes on the login node.
+  - Commands attempted:
+    - RAE2Agent/occultation_analysis.py --data ... --data-cols rv2_coarse --random-sky 200 --no-planets --output-dir RAE2Agent/output_event_revised
+    - RAE2Agent/occultation_analysis.py --data ... --data-cols rv2_coarse --random-sky 100 --no-planets --output-dir RAE2Agent/output_event_revised_v2
+  - Meaning: the event-based approach is still viable, but the full CSV load on the login node exceeds the current timeout; this should be run on an interactive node or with a longer runtime allowance.
+
+Interpretation goal (per user guidance)
+- Expectation: above ~2 MHz (bands 5-9), the downwards-facing beam should see less beyond the lunar limb, so random-like behavior in high bands is acceptable; detection only in low bands (<=1.31 MHz) could still be consistent with a real occultation signal.
+- Next step: once the event-based run completes, inspect event_random_percentile_per_band_rv2_coarse.csv and per-source random_percentile plots, focusing on low vs high band separation.
+
+Speed-up changes for event-based pipeline
+- Added parallel processing across targets via --n-processes (fork-based multiprocessing).
+- Added event subsampling controls:
+  - --event-stride / --max-events for real targets
+  - --random-event-stride / --random-max-events for random sky baselines
+- These options should reduce wall time significantly by cutting the number of event windows per target and parallelizing target loops.
+
+Recommended fast run (rv2, no planets):
+- python RAE2Agent/occultation_analysis.py \
+    --data /global/cfs/projectdirs/m4895/RAE2Data/interpolatedRAE2MasterFile.csv \
+    --data-cols rv2_coarse --no-planets --random-sky 100 \
+    --random-event-stride 10 --random-max-events 200 \
+    --n-processes <N>
+
+Event-based fast run on interactive node (rv2 only)
+- Command: salloc --nodes 1 --qos interactive --time 02:00:00 --constraint cpu --account m4895 -- bash -lc "conda run -n luseepy_env python RAE2Agent/occultation_analysis.py --data /global/cfs/projectdirs/m4895/RAE2Data/interpolatedRAE2MasterFile.csv --data-cols rv2_coarse --no-planets --random-sky 100 --random-event-stride 10 --random-max-events 200 --n-processes 8 --output-dir RAE2Agent/output_event_fast"
+- Output dir: RAE2Agent/output_event_fast
+- Summary (random_percentile median by band group):
+  - Cygnus-A: low~0.16, high~0.16 (no strong detection)
+  - Fornax-A: low~0.96, high~0.86 (elevated even at high bands)
+  - Sag-A: low~0.00, high~0.96 (high-band elevation inconsistent with >2 MHz expectation)
+  - Earth: low~0.76, high~1.00 (strongly elevated)
+- Interpretation: high-band elevation for Fornax-A/Sag-A suggests remaining systematics or selection effects; random baseline may still be biased even in event-window approach.
+
+Event-based fast run with more random sky points (rv2 only)
+- Command: salloc --nodes 1 --qos interactive --time 02:00:00 --constraint cpu --account m4895 -- bash -lc "conda run -n luseepy_env python RAE2Agent/occultation_analysis.py --data /global/cfs/projectdirs/m4895/RAE2Data/interpolatedRAE2MasterFile.csv --data-cols rv2_coarse --no-planets --random-sky 500 --random-event-stride 10 --random-max-events 200 --n-processes 8 --output-dir RAE2Agent/output_event_fast500"
+- Output dir: RAE2Agent/output_event_fast500
+- Low-band (bands 1-4) random_percentile per band:
+  - Cygnus-A: b1=0.100, b2=0.226, b3=0.596, b4=0.146 (median 0.186)
+  - Fornax-A: b1=0.512, b2=0.930, b3=1.000, b4=1.000 (median 0.965)
+  - Sag-A: b1=0.674, b2=0.004, b3=0.000, b4=0.000 (median 0.002)
+  - Earth: b1=1.000, b2=0.988, b3=0.524, b4=0.074 (median 0.756)
+- Interpretation: the larger random baseline does not eliminate the mixed behavior; Sag-A shows very low percentiles in bands 2-4 (potential negative dips), while Fornax-A remains strongly elevated even in the lowest bands, suggesting residual systematics or a sign convention mismatch for that target.
+
+Moon ephemeris removal + timing run (no subsampling)
+- Code change: removed get_body("moon") usage by shifting geocentric Sun/planet vectors using the Moon->Earth vector from the CSV (fixed distance), so occultation geometry is computed relative to the Moon without querying the Moon ephemeris.
+- Timing run (rv2 only, no planets, no subsampling):
+  - Command: /usr/bin/time -p conda run -n luseepy_env python RAE2Agent/occultation_analysis.py --data /global/cfs/projectdirs/m4895/RAE2Data/interpolatedRAE2MasterFile.csv --data-cols rv2_coarse --no-planets --start "1974-09-07 14:00" --end "1974-09-14 14:00" --random-sky 200 --event-stride 1 --max-events 0 --random-event-stride 1 --random-max-events 0 --output-dir RAE2Agent/output_event_week_nosub
+  - Wall time: 144.83 s for 7 days (1 week)
+  - Extrapolated full-period time (1974-09-07 14:00 to 1975-06-27 16:00, 293.08 days ≈ 41.87 weeks): ~6064 s ≈ 1.68 hours
+  - Note: extrapolation assumes linear scaling in number of events; adding planets or more random sky points will increase runtime.
+
+Limb precomputation (sun/earth farther from limb only) + timing run (no subsampling)
+- Code change: precompute sun/earth limb distances for all timestamps and keep events where both are beyond the limb thresholds, then filter events by lookup (no per-event ephemeris calls).
+- Timing run (rv2 only, no planets, no subsampling):
+  - Command: /usr/bin/time -p conda run -n luseepy_env python RAE2Agent/occultation_analysis.py --data /global/cfs/projectdirs/m4895/RAE2Data/interpolatedRAE2MasterFile.csv --data-cols rv2_coarse --no-planets --start "1974-09-07 14:00" --end "1974-09-14 14:00" --random-sky 200 --event-stride 1 --max-events 0 --random-event-stride 1 --random-max-events 0 --output-dir RAE2Agent/output_event_week_nosub_limbcache
+  - Wall time: 181.66 s for 7 days (1 week)
+  - Extrapolated full-period time (1974-09-07 14:00 to 1975-06-27 16:00, 293.08 days ≈ 41.87 weeks): ~7606 s ≈ 2.11 hours
+  - Note: this precompute path was slower for a 1-week subset, likely because it computes Sun geometry for every timestamp; it may still help when reusing the mask across many targets or longer runs.
+
+Full run on interactive node (parallelized)
+- Command: salloc --nodes 1 --qos interactive --time 04:00:00 --constraint cpu --account m4895 --cpus-per-task 8 -- bash -lc "conda run -n luseepy_env python RAE2Agent/occultation_analysis.py --data /global/cfs/projectdirs/m4895/RAE2Data/interpolatedRAE2MasterFile.csv --data-cols rv2_coarse --start '1974-09-07 14:00' --end '1975-06-27 16:00' --random-sky 200 --event-stride 1 --max-events 0 --random-event-stride 1 --random-max-events 0 --n-processes ${SLURM_CPUS_PER_TASK:-8} --output-dir RAE2Agent/output_event_full_limbcache"
+- Wall time: 5192.16 s (~86.5 min)
+- Output dir: RAE2Agent/output_event_full_limbcache
+- Notes: ran with 8 parallel workers; runtime warnings about divide-by-zero in occultation geometry and precision loss in t-tests appeared but run completed.

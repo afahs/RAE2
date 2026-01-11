@@ -1,0 +1,11 @@
+target,kind,data_col,z_score,random_percentile,random_n
+Fornax-A,fixed,rv2_coarse,2.107714068658728,0.596,500
+Cygnus-A,fixed,rv2_coarse,4.925482368476102,0.806,500
+Sag-A,fixed,rv2_coarse,0.46438645876951073,0.486,500
+Mercury,planet,rv2_coarse,-0.7355916699934939,0.136,500
+Venus,planet,rv2_coarse,4.179015372533651,0.718,500
+Mars,planet,rv2_coarse,-0.7251638335729681,0.138,500
+Jupiter,planet,rv2_coarse,4.925412303757221,0.806,500
+Saturn,planet,rv2_coarse,-0.6241414909547687,0.158,500
+Uranus,planet,rv2_coarse,4.747956723942866,0.746,500
+Neptune,planet,rv2_coarse,0.05223717831388322,0.398,500

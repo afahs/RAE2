@@ -1,0 +1,5 @@
+event_id,event_time,event_type,planet,sun_sep_deg,mercury_sep_deg,venus_sep_deg,earth_sep_deg,mars_sep_deg,jupiter_sep_deg,saturn_sep_deg,uranus_sep_deg,neptune_sep_deg
+E1,1974-12-01 00:10:00,DISAPPEARANCE,SATURN,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0
+E2,1974-12-01 00:20:00,REAPPEARANCE,SATURN,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0
+E3,1974-12-01 00:30:00,DISAPPEARANCE,SATURN,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0
+E4,1974-12-01 00:40:00,REAPPEARANCE,SATURN,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0
