@@ -31,14 +31,19 @@ python --version
 ```
 
 If that command does not report Python 3.10 or newer, activate or create a
-newer environment first. For example, with conda:
+newer environment first.
+
+With conda:
 
 ```bash
 conda create -n rae2-rylevonberg python=3.12
 conda activate rae2-rylevonberg
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
 ```
 
-Then install the package from the repository root:
+Or, if you already have a Python 3.10+ interpreter available, use a virtual
+environment:
 
 ```bash
 python -m venv .venv
