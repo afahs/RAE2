@@ -1,6 +1,14 @@
 # Usage
 
 Run commands from the project root after installing with `pip install -e .`.
+The active interpreter must be Python 3.10 or newer:
+
+```bash
+python --version
+```
+
+On systems where `python` or `python3` is older than 3.10, activate a newer
+environment first, then rerun the install commands from the README.
 
 ## Smoke Run
 
@@ -80,4 +88,3 @@ python -m rylevonberg.pipeline run-smoke \
   --output-dir outputs/smoke_interactive \
   --run-mode interactive
 ```
-

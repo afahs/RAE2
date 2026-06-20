@@ -23,7 +23,22 @@ The main package is `rylevonberg/`. Command-line entry points live in
 
 ## Install
 
-Use Python 3.10 or newer.
+Use Python 3.10 or newer. Check this first, especially on HPC login nodes
+where `python` may be Python 2.7 and `python3` may still be too old:
+
+```bash
+python --version
+```
+
+If that command does not report Python 3.10 or newer, activate or create a
+newer environment first. For example, with conda:
+
+```bash
+conda create -n rae2-rylevonberg python=3.12
+conda activate rae2-rylevonberg
+```
+
+Then install the package from the repository root:
 
 ```bash
 python -m venv .venv
@@ -60,7 +75,15 @@ python -m rylevonberg.pipeline run-smoke \
 The same command is available as a script after installation:
 
 ```bash
-rv-pipeline run-smoke --data "$RAE2_MASTER_CSV" --output-dir outputs/smoke
+rv-pipeline run-smoke \
+  --data "$RAE2_MASTER_CSV" \
+  --start "1973-10-03 04:00:00" \
+  --end "1973-10-03 06:00:00" \
+  --output-dir outputs/smoke_jupiter \
+  --source jupiter \
+  --frequency 4 \
+  --antenna rv2_coarse \
+  --run-mode local
 ```
 
 On HPC systems, request an interactive allocation first and use
@@ -117,4 +140,3 @@ tests only. Do not upload:
 - cache directories such as `__pycache__/` and `.pytest_cache/`
 - cleanup inventories or result reports under `reports/`
 - local planning notes under `planning_text/`
-
