@@ -1,0 +1,15 @@
+{
+  "frame": "fk4",
+  "equinox": "B1950",
+  "ephemeris": "builtin",
+  "value_columns": ["rv1_coarse", "rv2_coarse"],
+  "frequencies": [1, 2, 3, 4, 5, 6, 7, 8, 9],
+  "antennas": ["rv1_coarse", "rv2_coarse"],
+  "event_window_seconds": 600.0,
+  "baseline_order": 1,
+  "smooth_seconds": 0.0,
+  "timing_offsets_seconds": [-120, -60, -30, 0, 30, 60, 120],
+  "run_mode": "interactive",
+  "node_policy": "interactive-only"
+}
+

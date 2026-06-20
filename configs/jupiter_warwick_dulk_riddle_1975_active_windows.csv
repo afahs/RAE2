@@ -1,0 +1,60 @@
+date,event_start_hhmm,event_end_hhmm,intensity,burstiness,reported_freq_range_mhz,pdf_page,notes
+1974-11-02,0100,0345,2,SMOOTH,11-20,21,manual transcription from Warwick/Dulk/Riddle UAG-42 table
+1974-11-03,0118,0730,3,SMOOTH,11-32,22,manual transcription
+1974-11-04,0003,0430,2,SMOOTH,11-31,22,manual transcription
+1974-11-05,0645,0705,1,WEAK,12-20,22,manual transcription
+1974-11-08,0343,0400,1,MODERATE,13-26,22,manual transcription
+1974-11-09,0403,0423,1,STRONG,10-16,22,manual transcription
+1974-11-10,0253,0440,1,WEAK,12-20,22,manual transcription
+1974-11-11,0310,0325,1,SMOOTH,11-18,22,manual transcription
+1974-11-15,0208,0335,2,MODERATE,8-18,22,manual transcription
+1974-11-18,0041,0240,2,SMOOTH,12-35,22,manual transcription
+1974-11-19,0100,0303,2,SMOOTH,13-18,22,manual transcription
+1974-11-19,0512,0650,1,MODERATE,25-24,22,scan/table has wrapped or ambiguous frequency range
+1974-11-20,0045,0256,1,SMOOTH,15-20,22,manual transcription
+1974-11-21,0054,0225,1,SMOOTH,14-18,22,manual transcription
+1974-11-25,0037,0320,2,SMOOTH,17-33,22,manual transcription
+1974-11-26,0539,0610,1,MODERATE,14-24,22,manual transcription
+1974-11-27,0318,0438,1,MODERATE,20-26,22,manual transcription
+1974-11-27,2100,2200,2,SMOOTH,20-36,22,manual transcription
+1974-11-28,0020,0230,1,WEAK,11-21,22,manual transcription
+1974-11-29,0503,0603,1,STRONG,13-27,22,manual transcription
+1974-12-02,0300,0350,1,WEAK,18-24,22,manual transcription
+1974-12-03,0427,0550,1,MODERATE,13-35,22,manual transcription
+1974-12-04,0515,0531,1,WEAK,18-26,22,manual transcription
+1974-12-04,2200,2300,1,WEAK,18-31,22,manual transcription
+1974-12-05,0114,0200,1,MODERATE,14-18,22,manual transcription
+1974-12-07,0147,0200,1,SMOOTH,8-17,22,manual transcription
+1974-12-12,0148,0200,1,WEAK,15-28,22,manual transcription
+1974-12-13,0330,0402,1,MODERATE,12-15,22,manual transcription
+1974-12-14,0310,0407,1,STRONG,12-24,22,manual transcription
+1974-12-15,0015,0104,1,SMOOTH,13-20,22,manual transcription
+1974-12-16,0400,0520,1,WEAK,13-18,22,manual transcription
+1974-12-17,0010,0335,2,MODERATE,10-23,22,manual transcription
+1974-12-19,0159,0345,1,STRONG,12-20,22,manual transcription
+1974-12-24,0101,0153,1,SMOOTH,8-25,22,manual transcription
+1974-12-24,0321,0437,1,MODERATE,25-18,22,scan/table has wrapped or ambiguous frequency range
+1974-12-25,0147,0400,1,WEAK,14-18,22,manual transcription
+1974-12-30,0212,0234,1,STRONG,16-25,23,manual transcription
+1975-01-02,0400,0435,2,WEAK,12-21,23,manual transcription
+1975-01-03,0006,0020,1,MODERATE,15-23,23,manual transcription
+1975-01-04,0122,0251,2,STRONG,11-36,23,manual transcription
+1975-01-10,0000,0132,2,STRONG,13-29,23,manual transcription
+1975-01-11,0300,0400,2,MODERATE,9-33,23,manual transcription
+1975-01-12,0113,0245,2,STRONG,12-21,23,manual transcription
+1975-01-14,0247,0316,1,STRONG,11-20,23,manual transcription
+1975-01-16,0302,0340,1,WEAK,10-24,23,manual transcription
+1975-01-19,0220,0315,2,STRONG,17-30,23,manual transcription
+1975-01-24,0118,0321,2,MODERATE,12-29,23,manual transcription
+1975-01-27,1924,1936,2,SMOOTH,20-29,23,manual transcription
+1975-01-28,0200,0225,1,SMOOTH,8-12,23,manual transcription
+1975-01-28,2100,2153,2,WEAK,20-36,23,manual transcription
+1975-02-12,0030,0040,1,WEAK,25-34,24,manual transcription
+1975-02-12,2230,2313,1,WEAK,17-27,24,manual transcription; footnote says Jupiter was outside nominal beamwidth
+1975-02-23,2535,2550,1,MODERATE,13-17,24,manual transcription; time is next UTC day because HHMM exceeds 2400
+1975-02-25,2510,2550,1,STRONG,14-18,24,manual transcription; time is next UTC day because HHMM exceeds 2400
+1975-03-01,1745,1831,1,SMOOTH,20-37,24,manual transcription
+1975-03-05,2348,2418,1,STRONG,15-25,24,manual transcription; end time is next UTC day
+1975-03-06,2036,2125,1,WEAK,20-30,24,manual transcription
+1975-03-08,1905,2023,2,WEAK,20-36,24,manual transcription
+1975-03-15,2040,2055,1,SMOOTH,18-26,24,manual transcription

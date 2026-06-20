@@ -1,0 +1,8 @@
+target_id,source_name,target_band,target_frequency_mhz,target_antenna,target_window_s,best_timing_offset_s,notes
+sun_6p55_lower_v_0s,sun,8,6.55,rv2_coarse,300,0,primary lower-V solar anti-template channel
+sun_6p55_lower_v_90s,sun,8,6.55,rv2_coarse,300,90,previous template timing offset diagnostic
+cyg_a_0p45_upper_v_600s,cyg_a,1,0.45,rv1_coarse,600,0,strong historical Cyg A upper-V candidate/systematics probe
+cyg_a_0p45_upper_v_900s,cyg_a,1,0.45,rv1_coarse,900,0,window robustness check for Cyg A upper-V candidate
+cyg_a_0p45_lower_v_900s,cyg_a,1,0.45,rv2_coarse,900,0,lower-V comparison for Cyg A
+fornax_a_0p45_upper_v_900s,fornax_a,1,0.45,rv1_coarse,900,0,strong historical Fornax A low-frequency candidate
+fornax_a_9p18_upper_v_600s,fornax_a,9,9.18,rv1_coarse,600,0,strong historical Fornax A high-frequency candidate

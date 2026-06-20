@@ -1,0 +1,3 @@
+source_name,kind,body_name,ra_deg,dec_deg,frame,notes
+north_galactic_pole,fixed,,192.24999787112526,27.399949286301865,fk4,radio-quiet high Galactic latitude control generated from Galactic b=+90 in FK4 B1950
+south_galactic_pole,fixed,,12.250002128882667,-27.400050713840802,fk4,radio-quiet high Galactic latitude control generated from Galactic b=-90 in FK4 B1950

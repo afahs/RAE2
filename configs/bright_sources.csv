@@ -1,0 +1,12 @@
+source_name,kind,body_name,ra_deg,dec_deg,frame,notes
+cas_a,fixed,,350.85833,58.8,fk4,bright low-frequency control
+cyg_a,fixed,,299.86815,40.73392,fk4,bright low-frequency control
+tau_a,fixed,,83.63308,22.01450,fk4,bright low-frequency control
+vir_a,fixed,,187.70593,12.39112,fk4,bright low-frequency control
+fornax_a,fixed,,50.67383,-37.20823,fk4,legacy RAE-2 test source
+sgr_a,fixed,,266.41683,-29.00781,fk4,Galactic-center region proxy
+galactic_center,fixed,,265.61084,-28.91679,fk4,Galactic-center control
+sun,body,sun,,,fk4,solar positive control
+jupiter,body,jupiter,,,fk4,Jupiter positive control
+earth,earth,earth,,,fk4,Earth occultation positive control from CSV Earth vector
+

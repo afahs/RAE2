@@ -1,0 +1,13 @@
+frequency_mhz,brightness_w_m2_hz_sr,total_error_percent,calibration_source
+0.50,1.10e-21,25,Page et al. 2022 Fig. 3 mean sky intensity from PSP/FIELDS scaled to Novaco and Brown; digitized/approximate
+0.60,1.80e-21,25,Page et al. 2022 Fig. 3 mean sky intensity from PSP/FIELDS scaled to Novaco and Brown; digitized/approximate
+0.70,3.00e-21,25,Page et al. 2022 Fig. 3 mean sky intensity from PSP/FIELDS scaled to Novaco and Brown; digitized/approximate
+0.90,5.00e-21,25,Page et al. 2022 Fig. 3 mean sky intensity from PSP/FIELDS scaled to Novaco and Brown; digitized/approximate
+1.00,6.30e-21,25,Page et al. 2022 Fig. 3 mean sky intensity from PSP/FIELDS scaled to Novaco and Brown; digitized/approximate
+1.31,8.00e-21,25,Page et al. 2022 Fig. 3 mean sky intensity from PSP/FIELDS scaled to Novaco and Brown; digitized/approximate
+1.60,9.00e-21,25,Page et al. 2022 Fig. 3 mean sky intensity from PSP/FIELDS scaled to Novaco and Brown; digitized/approximate
+2.20,1.05e-20,25,Page et al. 2022 Fig. 3 mean sky intensity from PSP/FIELDS scaled to Novaco and Brown; digitized/approximate
+3.93,1.15e-20,25,Page et al. 2022 Fig. 3 mean sky intensity from PSP/FIELDS scaled to Novaco and Brown; digitized/approximate
+4.70,1.15e-20,25,Page et al. 2022 Fig. 3 mean sky intensity from PSP/FIELDS scaled to Novaco and Brown; digitized/approximate
+6.00,1.05e-20,25,Page et al. 2022 Fig. 3 mean sky intensity from PSP/FIELDS scaled to Novaco and Brown; digitized/approximate
+7.00,1.00e-20,25,Page et al. 2022 Fig. 3 mean sky intensity from PSP/FIELDS scaled to Novaco and Brown; digitized/approximate

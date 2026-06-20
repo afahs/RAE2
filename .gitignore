@@ -1,6 +1,58 @@
+# Python caches and build products
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
 
-RAE2Agent/sim_inputs/*.csv
+# Local environments
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
 
-RAE2Agent/sim_inputs/*.csv
+# Generated outputs and local data
+outputs/
+data/
+raw_data/
+derived_data/
+external_data/
+scratch/
+tmp/
+logs/
+*.log
 
-RAE2Agent/sim_inputs/*.csv
+# Large or generated scientific artifacts
+*.npy
+*.npz
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+*.fits
+*.fit
+*.png
+*.jpg
+*.jpeg
+*.tif
+*.tiff
+*.pdf
+
+# Local result/planning material
+reports/
+planning_text/
+
+# Editors and OS metadata
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+

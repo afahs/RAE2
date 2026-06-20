@@ -1,0 +1,11 @@
+include README.md
+include LICENSE
+include .env.example
+recursive-include configs *.csv *.json
+recursive-include docs *.md
+recursive-include examples *.py *.sh
+recursive-exclude outputs *
+recursive-exclude reports *
+recursive-exclude planning_text *
+recursive-exclude * __pycache__ *.py[cod]
+
