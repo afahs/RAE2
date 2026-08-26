@@ -7,7 +7,12 @@ import pytest
 from rylevonberg.controls import injection_recovery, randomized_event_times, time_reversed_events
 from rylevonberg.detection import StepFitConfig
 from rylevonberg.jobs import require_interactive_mode
-from rylevonberg.stacking import aligned_profiles, fast_stack_summary, stack_profiles
+from rylevonberg.stacking import (
+    aligned_profiles,
+    fast_stack_summary,
+    randomized_stack_distribution,
+    stack_profiles,
+)
 
 
 def _mini_data():
@@ -52,7 +57,21 @@ def test_fast_stack_summary_keeps_randomized_realizations_separate() -> None:
 
     assert len(summary) == 2
     assert set(summary["control_id"]) == {0, 1}
+    assert set(summary["n_input_events"]) == {1}
     assert summary["stacked_snr"].notna().all()
+
+
+def test_randomized_stack_distribution_preserves_full_input_per_realization() -> None:
+    clean, events = _mini_data()
+    events = pd.concat(
+        [events, events.assign(event_id=1, predicted_event_time=events["predicted_event_time"] + pd.Timedelta(minutes=2))],
+        ignore_index=True,
+    )
+
+    summary = randomized_stack_distribution(clean, events, window_seconds=300, n_random=4, seed=7)
+
+    assert set(summary["control_id"]) == {0, 1, 2, 3}
+    assert set(summary["n_input_events"]) == {2}
 
 
 def test_controls_and_job_guard() -> None:

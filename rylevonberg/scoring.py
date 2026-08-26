@@ -172,8 +172,18 @@ def _merge_injection_summary(scored: pd.DataFrame, injection_grid: pd.DataFrame 
 
 
 def grade_detection(row: pd.Series, cfg: ScoreConfig) -> str:
-    best_p = np.nanmin([row.get("stepfit_empirical_p", np.nan), row.get("matched_empirical_p", np.nan)])
-    best_snr = np.nanmax([abs(row.get("detection_snr", np.nan)), abs(row.get("matched_snr", np.nan))])
+    p_values = pd.to_numeric(
+        pd.Series([row.get("stepfit_empirical_p", np.nan), row.get("matched_empirical_p", np.nan)]),
+        errors="coerce",
+    ).to_numpy(dtype=float)
+    snr_values = pd.to_numeric(
+        pd.Series([row.get("detection_snr", np.nan), row.get("matched_snr", np.nan)]),
+        errors="coerce",
+    ).abs().to_numpy(dtype=float)
+    finite_p = p_values[np.isfinite(p_values)]
+    finite_snr = snr_values[np.isfinite(snr_values)]
+    best_p = float(np.min(finite_p)) if finite_p.size else np.nan
+    best_snr = float(np.max(finite_snr)) if finite_snr.size else np.nan
     method_agree = bool(row.get("method_sign_agreement", False))
     enough_support = int(row.get("supporting_frequency_count", 0)) >= 2 or int(row.get("supporting_antenna_count", 0)) >= 2
     clean = row.get("quality_clean_fraction", np.nan)

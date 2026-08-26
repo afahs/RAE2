@@ -239,6 +239,7 @@ def fast_stack_summary(
     if events_df.empty:
         return pd.DataFrame()
     group_cols = list(by or ["source_name", "frequency_band", "antenna"])
+    input_counts = events_df.groupby(group_cols, dropna=False, sort=False).size().to_dict()
     clean_groups = {
         (freq, antenna): group.sort_values("time").reset_index(drop=True)
         for (freq, antenna), group in clean_df.groupby(["frequency_band", "antenna"], dropna=False, sort=True)
@@ -290,6 +291,7 @@ def fast_stack_summary(
         rows.append(
             {
                 **dict(zip(group_cols, key)),
+                "n_input_events": int(input_counts.get(key, 0)),
                 "n_events": int(len(slot["events"])),
                 "stacked_amplitude": amplitude,
                 "stacked_snr": snr,
@@ -298,3 +300,46 @@ def fast_stack_summary(
             }
         )
     return add_frequency_mhz_column(pd.DataFrame.from_records(rows))
+
+
+def randomized_stack_distribution(
+    clean_df: pd.DataFrame,
+    events_df: pd.DataFrame,
+    window_seconds: float,
+    n_random: int = 30,
+    seed: int = 12345,
+    baseline_mode: str = "linear_all",
+    sideband_exclusion_seconds: float = 120.0,
+) -> pd.DataFrame:
+    """Build complete randomized-time stack realizations.
+
+    Every realization starts from the full event table.  This differs from
+    event-level scoring ensembles, which may be capped for runtime and must
+    not be reused as a source-stack null distribution.
+    """
+    if events_df.empty or int(n_random) <= 0:
+        return pd.DataFrame()
+    start_ns = pd.Timestamp(clean_df["time"].min()).value
+    end_ns = pd.Timestamp(clean_df["time"].max()).value
+    if end_ns <= start_ns:
+        return pd.DataFrame()
+    rng = np.random.default_rng(int(seed))
+    realizations = []
+    for control_id in range(int(n_random)):
+        randomized = events_df.copy()
+        randomized["predicted_event_time"] = pd.to_datetime(
+            rng.integers(start_ns, end_ns, size=len(randomized)),
+            unit="ns",
+        )
+        randomized["control_type"] = "randomized_time_stack"
+        randomized["control_id"] = int(control_id)
+        realizations.append(randomized)
+    controls = pd.concat(realizations, ignore_index=True)
+    return fast_stack_summary(
+        clean_df,
+        controls,
+        window_seconds,
+        by=["source_name", "frequency_band", "antenna", "control_type", "control_id"],
+        baseline_mode=baseline_mode,
+        sideband_exclusion_seconds=sideband_exclusion_seconds,
+    )

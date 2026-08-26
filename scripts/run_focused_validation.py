@@ -30,7 +30,7 @@ from rylevonberg.source_summary import (
     final_source_summary,
 )
 from rylevonberg.sources import filter_sources, load_source_list
-from rylevonberg.stacking import aligned_profiles, fast_stack_summary, stack_profiles
+from rylevonberg.stacking import aligned_profiles, randomized_stack_distribution, stack_profiles
 from rylevonberg.util import ensure_dir, write_json
 
 
@@ -88,6 +88,8 @@ def _run_detection_stack_score(
     random_seed: int,
     control_events: pd.DataFrame | None = None,
     write_tables: bool = True,
+    n_random_stack_controls: int = 20,
+    force_randomized_stacks: bool = False,
 ) -> dict[str, pd.DataFrame]:
     ensure_dir(out_dir)
     cfg = StepFitConfig(
@@ -126,14 +128,14 @@ def _run_detection_stack_score(
             timing_grid_seconds=(-120.0, -60.0, -30.0, 0.0, 30.0, 60.0, 120.0),
         ),
     )
-    randomized_controls = controls[
-        controls.get("control_type", pd.Series("", index=controls.index)).astype(str).eq("randomized_time")
-    ].reset_index(drop=True)
-    randomized_stack = fast_stack_summary(
+    randomized_stack = _load_or_build_randomized_stacks(
         clean,
-        randomized_controls,
+        stack_events,
         window_s,
-        by=["source_name", "frequency_band", "antenna", "control_type", "control_id"],
+        out_dir / "randomized_stack_summary.csv",
+        n_random=n_random_stack_controls,
+        seed=random_seed + 100_000,
+        force=force_randomized_stacks,
     )
     if write_tables:
         step.to_csv(out_dir / "per_event_stepfit_detections.csv", index=False)
@@ -160,22 +162,31 @@ def _run_detection_stack_score(
     }
 
 
-def _existing_randomized_stacks(clean: pd.DataFrame, root: Path, source: str, window_s: float) -> pd.DataFrame:
-    """Recompute complete randomized realizations from a survey control ensemble."""
-    controls_path = root / "06_validation" / "negative_control_event_ensemble.csv"
-    if not controls_path.exists():
-        return pd.DataFrame()
-    controls = _read_csv(controls_path, parse_dates=["predicted_event_time"])
-    controls = controls[
-        controls["source_name"].astype(str).eq(source)
-        & controls["control_type"].astype(str).eq("randomized_time")
-    ].reset_index(drop=True)
-    return fast_stack_summary(
+def _load_or_build_randomized_stacks(
+    clean: pd.DataFrame,
+    events: pd.DataFrame,
+    window_s: float,
+    path: Path,
+    n_random: int,
+    seed: int,
+    force: bool = False,
+) -> pd.DataFrame:
+    """Reuse only complete-event randomized stack caches."""
+    if path.exists() and not force:
+        cached = _read_csv(path)
+        required = {"control_id", "n_input_events", "stacked_snr"}
+        if required.issubset(cached.columns) and cached["control_id"].nunique() >= int(n_random):
+            return cached
+    out = randomized_stack_distribution(
         clean,
-        controls,
+        events,
         window_s,
-        by=["source_name", "frequency_band", "antenna", "control_type", "control_id"],
+        n_random=n_random,
+        seed=seed,
     )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    out.to_csv(path, index=False)
+    return out
 
 
 def _generate_cyg_offsource(
@@ -256,6 +267,8 @@ def _earth_report(
     earth_root: Path,
     out_reports: Path,
     source_rows: list[pd.DataFrame],
+    n_random_stack_controls: int,
+    force_randomized_stacks: bool,
 ) -> None:
     events = _read_csv(earth_root / "02_events" / "predicted_events.csv", parse_dates=["predicted_event_time"])
     scored = _read_csv(earth_root / "07_scoring" / "scored_detections.csv", parse_dates=["predicted_event_time"])
@@ -266,7 +279,16 @@ def _earth_report(
     earth_stack = stack_summary[stack_summary["source_name"].eq("earth")].reset_index(drop=True)
     quality = event_window_quality(clean, earth_events, 600.0)
     block = block_jackknife_from_profiles(profiles[profiles["source_name"].eq("earth")])
-    randomized_stack = _existing_randomized_stacks(clean, earth_root, "earth", 600.0)
+    report_dir = ensure_dir(out_reports / "earth_positive_control_assets")
+    randomized_stack = _load_or_build_randomized_stacks(
+        clean,
+        earth_events,
+        600.0,
+        report_dir / "earth_randomized_stack_summary.csv",
+        n_random=n_random_stack_controls,
+        seed=20260826,
+        force=force_randomized_stacks,
+    )
     source_rows.append(
         aggregate_source_level(
             earth_events,
@@ -279,8 +301,6 @@ def _earth_report(
         )
     )
 
-    report_dir = ensure_dir(out_reports / "earth_positive_control_assets")
-    randomized_stack.to_csv(report_dir / "earth_randomized_stack_summary.csv", index=False)
     strongest = earth_stack.assign(abs_snr=earth_stack["stacked_snr"].abs()).sort_values("abs_snr", ascending=False).head(5)
     split_rows = []
     for _, row in strongest.iterrows():
@@ -418,6 +438,8 @@ def _cyg_forensic(
     offsource_summary: pd.DataFrame,
     source_rows: list[pd.DataFrame],
     windows: list[float],
+    n_random_stack_controls: int,
+    force_randomized_stacks: bool,
 ) -> None:
     events = _read_csv(bright_root / "02_events" / "predicted_events.csv", parse_dates=["predicted_event_time"])
     cyg = events[
@@ -442,6 +464,8 @@ def _cyg_forensic(
             forensic_dir / f"window_{int(window)}s",
             random_seed=777 + int(window),
             write_tables=True,
+            n_random_stack_controls=n_random_stack_controls,
+            force_randomized_stacks=force_randomized_stacks,
         )
         block = block_jackknife_from_profiles(run["profiles"])
         source_level = aggregate_source_level(
@@ -515,14 +539,23 @@ def _append_existing_jupiter(
     jupiter_root: Path,
     out_root: Path,
     source_rows: list[pd.DataFrame],
+    n_random_stack_controls: int,
+    force_randomized_stacks: bool,
 ) -> None:
     events = _read_csv(jupiter_root / "02_events" / "predicted_events.csv", parse_dates=["predicted_event_time"])
     for window in [600.0, 900.0]:
         run_dir = jupiter_root / "09_window_sweep" / f"window_{int(window)}s"
         scored = _read_csv(run_dir / "scored_detections.csv", parse_dates=["predicted_event_time"])
         stack = _read_csv(run_dir / "stacked_detection_summary.csv")
-        randomized_stack = _existing_randomized_stacks(clean, jupiter_root, "jupiter", window)
-        randomized_stack.to_csv(out_root / f"jupiter_randomized_stack_summary_{int(window)}s.csv", index=False)
+        randomized_stack = _load_or_build_randomized_stacks(
+            clean,
+            events,
+            window,
+            out_root / f"jupiter_randomized_stack_summary_{int(window)}s.csv",
+            n_random=n_random_stack_controls,
+            seed=20260826 + int(window),
+            force=force_randomized_stacks,
+        )
         source_rows.append(
             aggregate_source_level(
                 events,
@@ -572,6 +605,8 @@ def main() -> None:
     parser.add_argument("--windows", nargs="+", type=float, default=[600.0, 900.0])
     parser.add_argument("--force-cyg-predict", action="store_true")
     parser.add_argument("--force-offsource-stacks", action="store_true")
+    parser.add_argument("--n-random-stack-controls", type=int, default=20)
+    parser.add_argument("--force-randomized-stacks", action="store_true")
     args = parser.parse_args()
 
     out_root = ensure_dir(args.output_root)
@@ -589,10 +624,34 @@ def main() -> None:
     )
 
     source_rows: list[pd.DataFrame] = []
-    _earth_report(clean, Path(args.earth_root), out_reports, source_rows)
+    _earth_report(
+        clean,
+        Path(args.earth_root),
+        out_reports,
+        source_rows,
+        args.n_random_stack_controls,
+        args.force_randomized_stacks,
+    )
     _sun_report(clean, Path(args.earth_root), out_reports, source_rows)
-    _cyg_forensic(clean, Path(args.bright_root), out_root, out_reports, off_summary, source_rows, args.windows)
-    _append_existing_jupiter(clean, Path(args.jupiter_root), out_root, source_rows)
+    _cyg_forensic(
+        clean,
+        Path(args.bright_root),
+        out_root,
+        out_reports,
+        off_summary,
+        source_rows,
+        args.windows,
+        args.n_random_stack_controls,
+        args.force_randomized_stacks,
+    )
+    _append_existing_jupiter(
+        clean,
+        Path(args.jupiter_root),
+        out_root,
+        source_rows,
+        args.n_random_stack_controls,
+        args.force_randomized_stacks,
+    )
     _jupiter_episodic_note(Path(args.jupiter_root), out_reports)
 
     source_level = pd.concat([df for df in source_rows if df is not None and not df.empty], ignore_index=True)
@@ -611,6 +670,8 @@ def main() -> None:
             "prediction_cadence_seconds": args.prediction_cadence_seconds,
             "force_cyg_predict": args.force_cyg_predict,
             "force_offsource_stacks": args.force_offsource_stacks,
+            "n_random_stack_controls": args.n_random_stack_controls,
+            "force_randomized_stacks": args.force_randomized_stacks,
         },
     )
     print("offsource_controls: outputs/focused_validation/controls/offsource_controls.csv")

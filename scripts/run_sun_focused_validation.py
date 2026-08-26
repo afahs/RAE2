@@ -32,7 +32,7 @@ from rylevonberg.source_summary import (
     block_jackknife_from_profiles,
     final_source_summary,
 )
-from rylevonberg.stacking import fast_stack_summary, stack_profiles
+from rylevonberg.stacking import fast_stack_summary, randomized_stack_distribution, stack_profiles
 from rylevonberg.util import ensure_dir, write_json
 
 
@@ -146,7 +146,9 @@ def main() -> None:
     parser.add_argument("--antennas", nargs="+", default=["rv1_coarse", "rv2_coarse"])
     parser.add_argument("--annulus-positions", type=int, default=4)
     parser.add_argument("--radial-offsets", nargs="+", type=float, default=[2.0, 5.0, 10.0])
+    parser.add_argument("--n-random-stack-controls", type=int, default=20)
     parser.add_argument("--force-predict", action="store_true", help="Regenerate off-ephemeris predicted events even if the table exists.")
+    parser.add_argument("--force-randomized-stacks", action="store_true")
     args = parser.parse_args()
 
     out_root = ensure_dir(args.output_root)
@@ -207,20 +209,22 @@ def main() -> None:
         )
     off_stack.to_csv(controls_dir / "sun_offephemeris_stack_summary.csv", index=False)
 
-    randomized_events = _read_csv(root / "06_validation" / "negative_control_event_ensemble.csv", parse_dates=["predicted_event_time"])
-    randomized_events = randomized_events[
-        randomized_events["source_name"].eq("sun")
-        & randomized_events["control_type"].eq("randomized_time")
-        & randomized_events["frequency_band"].isin(args.frequencies)
-        & randomized_events["antenna"].astype(str).isin(set(args.antennas))
-    ].reset_index(drop=True)
-    randomized_stack = fast_stack_summary(
-        clean,
-        randomized_events,
-        args.window,
-        by=["source_name", "frequency_band", "antenna", "control_type", "control_id"],
-    )
-    randomized_stack.to_csv(controls_dir / "sun_randomized_stack_summary.csv", index=False)
+    randomized_path = controls_dir / "sun_randomized_stack_summary.csv"
+    randomized_stack = pd.DataFrame()
+    if randomized_path.exists() and not args.force_randomized_stacks:
+        cached = _read_csv(randomized_path)
+        required = {"control_id", "n_input_events", "stacked_snr"}
+        if required.issubset(cached.columns) and cached["control_id"].nunique() >= int(args.n_random_stack_controls):
+            randomized_stack = cached
+    if randomized_stack.empty:
+        randomized_stack = randomized_stack_distribution(
+            clean,
+            sun_events,
+            args.window,
+            n_random=args.n_random_stack_controls,
+            seed=20260826,
+        )
+        randomized_stack.to_csv(randomized_path, index=False)
 
     quality = event_window_quality(clean, sun_events, args.window)
     burst = event_burst_metrics(clean, sun_events, args.window)
@@ -331,6 +335,7 @@ def main() -> None:
             "antennas": args.antennas,
             "annulus_positions": args.annulus_positions,
             "radial_offsets": args.radial_offsets,
+            "n_random_stack_controls": args.n_random_stack_controls,
         },
     )
     print("sun_report: outputs/reports/sun_focused_validation.md")

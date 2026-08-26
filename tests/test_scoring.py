@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pandas as pd
 
 from rylevonberg.controls import injection_recovery_grid, negative_control_event_ensemble
 from rylevonberg.detection import StepFitConfig, run_matched_filter, run_stepfit_detections
-from rylevonberg.scoring import ScoreConfig, score_detections
+from rylevonberg.scoring import ScoreConfig, grade_detection, score_detections
 
 
 def _scoring_fixture() -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -55,3 +57,21 @@ def test_score_detections_adds_empirical_pvalues_and_antenna_orientation() -> No
     assert set(scored["moon_pointing"]) == {"away_from_moon", "toward_moon"}
     assert (scored["quality_clean_fraction"] == 1.0).all()
     assert {"supporting_frequency_count", "supporting_antenna_count", "supporting_channel_count"}.issubset(scored.columns)
+
+
+def test_grade_detection_handles_two_missing_methods_without_runtime_warning() -> None:
+    row = pd.Series(
+        {
+            "stepfit_empirical_p": np.nan,
+            "matched_empirical_p": np.nan,
+            "detection_snr": np.nan,
+            "matched_snr": np.nan,
+            "quality_clean_fraction": 1.0,
+        }
+    )
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        grade = grade_detection(row, ScoreConfig())
+
+    assert grade == "not_significant_against_controls"

@@ -151,6 +151,7 @@ def test_source_level_summary_and_offsource_pvalue() -> None:
             "antenna": ["rv2_coarse"] * 20,
             "control_type": ["randomized_time_stack"] * 20,
             "control_id": range(20),
+            "n_input_events": [2] * 20,
             "stacked_snr": np.linspace(-2.0, 2.0, 20),
         }
     )
@@ -190,6 +191,7 @@ def test_source_level_randomized_p_uses_stack_distribution_not_best_event_p() ->
             "frequency_band": [7.0] * 4,
             "antenna": ["rv2_coarse"] * 4,
             "control_type": ["randomized_time_stack"] * 4,
+            "n_input_events": [2] * 4,
             "stacked_snr": [9.0, -10.0, 1.0, 2.0],
         }
     )
@@ -197,6 +199,34 @@ def test_source_level_randomized_p_uses_stack_distribution_not_best_event_p() ->
     level = aggregate_source_level(events, scored, stack, randomized_stack=randomized)
 
     assert level.iloc[0]["randomized_empirical_p"] == 0.6
+
+
+def test_source_level_rejects_incomplete_randomized_realizations() -> None:
+    events = pd.DataFrame(
+        {
+            "source_name": ["sun", "sun"],
+            "predicted_event_time": pd.to_datetime(["1974-01-01", "1974-01-02"]),
+            "frequency_band": [7, 7],
+            "antenna": ["rv2_coarse", "rv2_coarse"],
+        }
+    )
+    stack = pd.DataFrame(
+        [{"source_name": "sun", "frequency_band": 7, "antenna": "rv2_coarse", "n_events": 2, "stacked_snr": 8.0}]
+    )
+    incomplete = pd.DataFrame(
+        {
+            "source_name": ["sun"],
+            "frequency_band": [7],
+            "antenna": ["rv2_coarse"],
+            "control_type": ["randomized_time_stack"],
+            "n_input_events": [1],
+            "stacked_snr": [1.0],
+        }
+    )
+
+    level = aggregate_source_level(events, pd.DataFrame(), stack, randomized_stack=incomplete)
+
+    assert np.isnan(level.iloc[0]["randomized_empirical_p"])
 
 
 def test_missing_stack_null_does_not_fall_back_to_event_pvalues() -> None:

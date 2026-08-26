@@ -110,6 +110,9 @@ def add_randomized_stack_pvalues(source_level: pd.DataFrame, randomized_stack: p
     pvals = []
     for _, row in out.iterrows():
         sub = _matching_control_rows(row, controls)
+        if "n_input_events" in sub.columns and pd.notna(row.get("n_input_events")):
+            input_counts = pd.to_numeric(sub["n_input_events"], errors="coerce")
+            sub = sub[input_counts == int(row["n_input_events"])]
         scores = sub["stacked_snr"] if "stacked_snr" in sub else pd.Series(dtype=float)
         pvals.append(randomized_stack_empirical_p(row.get("stacked_snr", np.nan), scores))
     out["randomized_empirical_p"] = pvals
@@ -198,7 +201,9 @@ def aggregate_source_level(
             "window_s": float(window_s),
             "event_type": event_type,
             "n_predicted_events": int(ev_sub["predicted_event_time"].nunique()) if not ev_sub.empty else np.nan,
+            "n_input_events": int(len(ev_sub)) if not ev_sub.empty else np.nan,
             "n_used_events": int(sc_sub["predicted_event_time"].nunique()) if not sc_sub.empty else int(st.get("n_events", 0)),
+            "n_stacked_events": int(st.get("n_events", 0)),
             "n_clean_events": clean_events if len(q_sub) else np.nan,
             "clean_fraction": clean_fraction,
             "stacked_snr": float(st.get("stacked_snr", np.nan)),
