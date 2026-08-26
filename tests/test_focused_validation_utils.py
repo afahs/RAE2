@@ -151,3 +151,28 @@ def test_source_level_summary_and_offsource_pvalue() -> None:
     final = final_source_summary(level)
     assert level.iloc[0]["offsource_empirical_p"] < 1.0
     assert final.iloc[0]["final_status"] == "positive_control_confirmed"
+
+
+def test_offsource_pvalue_matches_equivalent_numeric_band_dtypes() -> None:
+    source_level = pd.DataFrame(
+        [
+            {
+                "source": "sun",
+                "frequency_band": 7.0,
+                "antenna": "rv2_coarse",
+                "stacked_snr": 8.0,
+            }
+        ]
+    )
+    controls = pd.DataFrame(
+        {
+            "parent_source": ["sun", "sun"],
+            "frequency_band": [7, 7],
+            "antenna": ["rv2_coarse", "rv2_coarse"],
+            "stacked_snr": [1.0, 2.0],
+        }
+    )
+
+    result = add_offsource_pvalues(source_level, controls)
+
+    assert np.isfinite(result.iloc[0]["offsource_empirical_p"])

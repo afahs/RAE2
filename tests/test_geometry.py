@@ -23,3 +23,13 @@ def test_transition_time_interpolates_zero_crossing() -> None:
     assert len(events) == 1
     assert events.iloc[0]["event_type"] == "disappearance"
     assert events.iloc[0]["predicted_event_time"] == pd.Timestamp("1974-01-01 00:00:30")
+
+
+def test_transition_finder_ignores_missing_limb_samples() -> None:
+    times = pd.date_range("1974-01-01", periods=5, freq="1min")
+    limb = np.array([2.0, np.nan, 1.0, -1.0, -2.0])
+
+    events = find_limb_transitions(times, limb)
+
+    assert len(events) == 1
+    assert events.iloc[0]["predicted_event_time"] == pd.Timestamp("1974-01-01 00:02:30")

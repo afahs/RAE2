@@ -73,9 +73,15 @@ def add_offsource_pvalues(source_level: pd.DataFrame, offsource_stack: pd.DataFr
         sub = off
         if parent_col and pd.notna(row.get("source")):
             sub = sub[sub[parent_col].astype(str) == str(row["source"])]
-        for col in ["frequency_band", "antenna"]:
-            if col in sub and col in row and pd.notna(row[col]):
-                sub = sub[sub[col].astype(str) == str(row[col])]
+        if "frequency_band" in sub and "frequency_band" in row and pd.notna(row["frequency_band"]):
+            control_bands = pd.to_numeric(sub["frequency_band"], errors="coerce")
+            target_band = pd.to_numeric(pd.Series([row["frequency_band"]]), errors="coerce").iloc[0]
+            if pd.notna(target_band):
+                sub = sub[control_bands == target_band]
+            else:
+                sub = sub[sub["frequency_band"].astype(str) == str(row["frequency_band"])]
+        if "antenna" in sub and "antenna" in row and pd.notna(row["antenna"]):
+            sub = sub[sub["antenna"].astype(str) == str(row["antenna"])]
         controls = sub["stacked_snr"] if "stacked_snr" in sub else pd.Series(dtype=float)
         pvals.append(offsource_empirical_p(row.get("stacked_snr", np.nan), controls))
     out["offsource_empirical_p"] = pvals

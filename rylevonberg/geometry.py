@@ -97,8 +97,11 @@ def find_limb_transitions(
         return pd.DataFrame()
 
     visible = limb >= 0.0
+    finite_pair = np.isfinite(limb[1:]) & np.isfinite(limb[:-1])
+    valid_time_pair = ~time_index[1:].isna() & ~time_index[:-1].isna()
     rows = []
-    for idx in np.where(visible[1:] != visible[:-1])[0] + 1:
+    transition_pair = finite_pair & valid_time_pair & (visible[1:] != visible[:-1])
+    for idx in np.where(transition_pair)[0] + 1:
         t0 = pd.Timestamp(time_index[idx - 1])
         t1 = pd.Timestamp(time_index[idx])
         gap_s = float((t1 - t0).total_seconds())
@@ -120,4 +123,3 @@ def find_limb_transitions(
             }
         )
     return pd.DataFrame.from_records(rows)
-
