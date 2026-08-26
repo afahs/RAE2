@@ -19,6 +19,13 @@ def _mad(values: pd.Series) -> float:
     return float(np.median(np.abs(arr - med)))
 
 
+def _numeric_column(frame: pd.DataFrame, column: str) -> pd.Series:
+    """Return one optional numeric column as an index-aligned Series."""
+    if frame.empty or column not in frame.columns:
+        return pd.Series(np.nan, index=frame.index, dtype=float)
+    return pd.to_numeric(frame[column], errors="coerce")
+
+
 def block_jackknife_from_profiles(profile_df: pd.DataFrame, by: list[str] | None = None) -> pd.DataFrame:
     """Compute date-block jackknife stability for stacked profile groups."""
     if profile_df.empty:
@@ -60,6 +67,59 @@ def offsource_empirical_p(real_score: float, control_scores: pd.Series) -> float
     return _empirical_pvalue(float(real_score), pd.to_numeric(control_scores, errors="coerce").to_numpy(dtype=float))
 
 
+def randomized_stack_empirical_p(real_score: float, control_scores: pd.Series) -> float:
+    """Compare one real stack statistic with like-for-like randomized stacks."""
+    return _empirical_pvalue(float(real_score), pd.to_numeric(control_scores, errors="coerce").to_numpy(dtype=float))
+
+
+def _matching_control_rows(source_row: pd.Series, controls: pd.DataFrame) -> pd.DataFrame:
+    """Select controls for the same source, numeric band, and antenna."""
+    sub = controls
+    source = source_row.get("source", source_row.get("source_name"))
+    if "parent_source" in sub.columns and pd.notna(source):
+        sub = sub[sub["parent_source"].astype(str) == str(source)]
+    elif "source_name" in sub.columns and pd.notna(source):
+        sub = sub[sub["source_name"].astype(str) == str(source)]
+    if "frequency_band" in sub.columns and pd.notna(source_row.get("frequency_band")):
+        control_bands = pd.to_numeric(sub["frequency_band"], errors="coerce")
+        target_band = pd.to_numeric(pd.Series([source_row["frequency_band"]]), errors="coerce").iloc[0]
+        if pd.notna(target_band):
+            sub = sub[control_bands == target_band]
+        else:
+            sub = sub[sub["frequency_band"].astype(str) == str(source_row["frequency_band"])]
+    if "antenna" in sub.columns and pd.notna(source_row.get("antenna")):
+        sub = sub[sub["antenna"].astype(str) == str(source_row["antenna"])]
+    return sub
+
+
+def add_randomized_stack_pvalues(source_level: pd.DataFrame, randomized_stack: pd.DataFrame) -> pd.DataFrame:
+    """Attach empirical p-values from full randomized stack realizations.
+
+    Each row in ``randomized_stack`` must represent one complete randomized
+    realization for a source/frequency/antenna channel.  Per-event p-values
+    are intentionally not accepted as a substitute for this distribution.
+    """
+    out = source_level.copy()
+    if randomized_stack is None or randomized_stack.empty or source_level.empty:
+        out["randomized_empirical_p"] = np.nan
+        return out
+    controls = randomized_stack.copy()
+    if "control_type" in controls.columns:
+        randomized = controls["control_type"].astype(str).str.contains("random", case=False, na=False)
+        controls = controls[randomized]
+    pvals = []
+    for _, row in out.iterrows():
+        sub = _matching_control_rows(row, controls)
+        scores = sub["stacked_snr"] if "stacked_snr" in sub else pd.Series(dtype=float)
+        pvals.append(randomized_stack_empirical_p(row.get("stacked_snr", np.nan), scores))
+    out["randomized_empirical_p"] = pvals
+    if "decision_grade" in out.columns:
+        decisions = out.apply(decision_for_source_row, axis=1, result_type="expand")
+        out["decision_grade"] = decisions[0]
+        out["decision_reason"] = decisions[1]
+    return out
+
+
 def add_offsource_pvalues(source_level: pd.DataFrame, offsource_stack: pd.DataFrame) -> pd.DataFrame:
     """Attach p_offsource from off-source stacked SNRs."""
     out = source_level.copy()
@@ -67,21 +127,9 @@ def add_offsource_pvalues(source_level: pd.DataFrame, offsource_stack: pd.DataFr
         out["offsource_empirical_p"] = np.nan
         return out
     off = offsource_stack.copy()
-    parent_col = "parent_source" if "parent_source" in off.columns else None
     pvals = []
     for _, row in out.iterrows():
-        sub = off
-        if parent_col and pd.notna(row.get("source")):
-            sub = sub[sub[parent_col].astype(str) == str(row["source"])]
-        if "frequency_band" in sub and "frequency_band" in row and pd.notna(row["frequency_band"]):
-            control_bands = pd.to_numeric(sub["frequency_band"], errors="coerce")
-            target_band = pd.to_numeric(pd.Series([row["frequency_band"]]), errors="coerce").iloc[0]
-            if pd.notna(target_band):
-                sub = sub[control_bands == target_band]
-            else:
-                sub = sub[sub["frequency_band"].astype(str) == str(row["frequency_band"])]
-        if "antenna" in sub and "antenna" in row and pd.notna(row["antenna"]):
-            sub = sub[sub["antenna"].astype(str) == str(row["antenna"])]
+        sub = _matching_control_rows(row, off)
         controls = sub["stacked_snr"] if "stacked_snr" in sub else pd.Series(dtype=float)
         pvals.append(offsource_empirical_p(row.get("stacked_snr", np.nan), controls))
     out["offsource_empirical_p"] = pvals
@@ -98,6 +146,7 @@ def aggregate_source_level(
     stack_summary: pd.DataFrame,
     quality: pd.DataFrame | None = None,
     block_summary: pd.DataFrame | None = None,
+    randomized_stack: pd.DataFrame | None = None,
     window_s: float = 600.0,
     event_type: str = "combined",
 ) -> pd.DataFrame:
@@ -129,9 +178,8 @@ def aggregate_source_level(
         b_sub = pd.DataFrame()
         if block_summary is not None and not block_summary.empty:
             b_sub = block_summary[(block_summary["source_name"] == source) & (block_summary["frequency_band"] == freq) & (block_summary["antenna"] == antenna)]
-        timing = pd.to_numeric(sc_sub.get("timing_offset_sec"), errors="coerce") if not sc_sub.empty else pd.Series(dtype=float)
-        event_snr = pd.to_numeric(sc_sub.get("detection_snr"), errors="coerce") if not sc_sub.empty else pd.Series(dtype=float)
-        best_p = pd.to_numeric(sc_sub.get("best_empirical_p"), errors="coerce") if not sc_sub.empty else pd.Series(dtype=float)
+        timing = _numeric_column(sc_sub, "timing_offset_sec")
+        event_snr = _numeric_column(sc_sub, "detection_snr")
         quality_fail = ""
         if not q_sub.empty and "primary_quality_failure" in q_sub:
             failure_text = q_sub["primary_quality_failure"].astype(str)
@@ -156,7 +204,7 @@ def aggregate_source_level(
             "stacked_snr": float(st.get("stacked_snr", np.nan)),
             "stacked_amplitude": float(st.get("stacked_amplitude", np.nan)),
             "stacked_uncertainty": float(abs(st.get("stacked_amplitude", np.nan)) / abs(st.get("stacked_snr", np.nan))) if np.isfinite(st.get("stacked_snr", np.nan)) and st.get("stacked_snr", 0) != 0 else np.nan,
-            "randomized_empirical_p": float(best_p.min()) if best_p.notna().any() else np.nan,
+            "randomized_empirical_p": np.nan,
             "offsource_empirical_p": np.nan,
             "sign_fraction_positive": float((event_snr > 0).mean()) if event_snr.notna().any() else np.nan,
             "median_event_snr": float(event_snr.median()) if event_snr.notna().any() else np.nan,
@@ -172,6 +220,8 @@ def aggregate_source_level(
         }
         rows.append(row)
     out = add_frequency_mhz_column(pd.DataFrame.from_records(rows))
+    if randomized_stack is not None:
+        out = add_randomized_stack_pvalues(out, randomized_stack)
     if not out.empty:
         decisions = out.apply(decision_for_source_row, axis=1, result_type="expand")
         out["decision_grade"] = decisions[0]

@@ -52,16 +52,20 @@ def offset_unit_vectors_tangent(
     east_offset_deg: float = 0.0,
     north_offset_deg: float = 0.0,
 ) -> np.ndarray:
-    """Offset moving source vectors in the local tangent plane.
+    """Offset moving-source vectors along an exact great-circle displacement.
 
-    The offset is applied in the already-selected celestial frame. For the
-    small off-ephemeris controls used here, a tangent-plane displacement is
-    sufficient and keeps the fake source track parallel to the real body.
+    ``east_offset_deg`` and ``north_offset_deg`` define a direction and angular
+    distance in the local tangent basis.  The tangent vector is mapped back to
+    the unit sphere with the spherical exponential map, so large control
+    offsets retain their requested great-circle separation.
     """
     uvec = normalize_vectors(unit_vectors)
     out = np.full_like(uvec, np.nan, dtype=float)
     east_rad = np.deg2rad(float(east_offset_deg))
     north_rad = np.deg2rad(float(north_offset_deg))
+    offset_rad = float(np.hypot(east_rad, north_rad))
+    if not np.isfinite(offset_rad):
+        raise ValueError("moving-source offsets must be finite")
     z_axis = np.array([0.0, 0.0, 1.0])
     x_axis = np.array([1.0, 0.0, 0.0])
     for idx, vec in enumerate(uvec):
@@ -73,7 +77,11 @@ def offset_unit_vectors_tangent(
         east = east / np.linalg.norm(east)
         north = np.cross(vec, east)
         north = north / np.linalg.norm(north)
-        shifted = vec + east_rad * east + north_rad * north
+        if offset_rad == 0.0:
+            out[idx] = vec
+            continue
+        tangent_direction = (east_rad * east + north_rad * north) / offset_rad
+        shifted = np.cos(offset_rad) * vec + np.sin(offset_rad) * tangent_direction
         out[idx] = shifted / np.linalg.norm(shifted)
     return out
 

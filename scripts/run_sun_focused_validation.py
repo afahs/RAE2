@@ -18,7 +18,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from rylevonberg.events import predict_events
 from rylevonberg.constants import add_frequency_mhz_column
-from rylevonberg.detection import baseline_matrix, event_template
 from rylevonberg.plotting import plot_event_window
 from rylevonberg.quality import event_window_quality
 from rylevonberg.solar_controls import (
@@ -33,8 +32,8 @@ from rylevonberg.source_summary import (
     block_jackknife_from_profiles,
     final_source_summary,
 )
-from rylevonberg.stacking import aligned_profiles, stack_profiles
-from rylevonberg.util import datetime_ns, ensure_dir, robust_sigma, write_json
+from rylevonberg.stacking import fast_stack_summary, stack_profiles
+from rylevonberg.util import ensure_dir, write_json
 
 
 def _read_csv(path: str | Path, **kwargs) -> pd.DataFrame:
@@ -107,73 +106,6 @@ def _frequency_antenna_coherence(source_level: pd.DataFrame) -> pd.DataFrame:
             }
         )
     return pd.DataFrame.from_records(rows).sort_values("frequency_band")
-
-
-def _fast_stack_summary(clean: pd.DataFrame, events: pd.DataFrame, window_s: float) -> pd.DataFrame:
-    """Control-stack summary without materializing aligned profile rows."""
-    if events.empty:
-        return pd.DataFrame()
-    clean_groups = {
-        (freq, antenna): group.sort_values("time").reset_index(drop=True)
-        for (freq, antenna), group in clean.groupby(["frequency_band", "antenna"], dropna=False, sort=True)
-    }
-    accum: dict[tuple[object, object, object], dict[str, object]] = {}
-    for _, ev in events.iterrows():
-        freq = ev.get("frequency_band")
-        antenna = ev.get("antenna")
-        group = clean_groups.get((freq, antenna))
-        if group is None or group.empty:
-            continue
-        times = pd.DatetimeIndex(group["time"])
-        t_ns = datetime_ns(times)
-        event_ns = pd.Timestamp(ev["predicted_event_time"]).value
-        half_ns = int(float(window_s) * 1e9)
-        lo = int(np.searchsorted(t_ns, event_ns - half_ns, side="left"))
-        hi = int(np.searchsorted(t_ns, event_ns + half_ns, side="right"))
-        if hi <= lo:
-            continue
-        local = group.iloc[lo:hi]
-        rel = (datetime_ns(local["time"]) - event_ns).astype(float) / 1e9
-        y = pd.to_numeric(local["power"], errors="coerce").to_numpy(dtype=float)
-        valid = local["is_valid"].to_numpy(dtype=bool) if "is_valid" in local else np.ones(len(local), dtype=bool)
-        keep = valid & np.isfinite(y) & (np.abs(rel) <= float(window_s))
-        if np.count_nonzero(keep) < 6:
-            continue
-        tr = rel[keep]
-        yy = y[keep]
-        B = baseline_matrix(tr, 1)
-        beta, *_ = np.linalg.lstsq(B, yy, rcond=None)
-        yd = yy - B @ beta
-        sig = robust_sigma(yd)
-        if np.isfinite(sig) and sig > 0:
-            yd = yd / sig
-        tmpl = event_template(tr, str(ev["event_type"]))
-        key = (ev["source_name"], freq, antenna)
-        slot = accum.setdefault(key, {"values": [], "templates": [], "events": set()})
-        slot["values"].append(yd)
-        slot["templates"].append(tmpl)
-        slot["events"].add((ev.get("event_id"), str(ev.get("predicted_event_time"))))
-    rows = []
-    for (source, freq, antenna), slot in accum.items():
-        vals = np.concatenate(slot["values"]) if slot["values"] else np.array([], dtype=float)
-        tmpl = np.concatenate(slot["templates"]) if slot["templates"] else np.array([], dtype=float)
-        denom = float(np.dot(tmpl, tmpl))
-        amp = float(np.dot(vals, tmpl) / denom) if denom > 0 else np.nan
-        sig = robust_sigma(vals)
-        snr = float(amp * np.sqrt(denom) / sig) if np.isfinite(sig) and sig > 0 else np.nan
-        rows.append(
-            {
-                "source_name": source,
-                "frequency_band": freq,
-                "antenna": antenna,
-                "n_events": int(len(slot["events"])),
-                "stacked_amplitude": amp,
-                "stacked_snr": snr,
-                "bootstrap_std": np.nan,
-                "jackknife_std": np.nan,
-            }
-        )
-    return add_frequency_mhz_column(pd.DataFrame.from_records(rows))
 
 
 def _classify_sun(source_level: pd.DataFrame, clusters: pd.DataFrame) -> tuple[str, str]:
@@ -265,7 +197,7 @@ def main() -> None:
     off_events = off_events[
         off_events["frequency_band"].isin(args.frequencies) & off_events["antenna"].astype(str).isin(set(args.antennas))
     ].reset_index(drop=True)
-    off_stack = _fast_stack_summary(clean, off_events, args.window)
+    off_stack = fast_stack_summary(clean, off_events, args.window)
     if not off_stack.empty:
         off_stack["window_s"] = float(args.window)
         off_stack = off_stack.merge(
@@ -275,10 +207,33 @@ def main() -> None:
         )
     off_stack.to_csv(controls_dir / "sun_offephemeris_stack_summary.csv", index=False)
 
+    randomized_events = _read_csv(root / "06_validation" / "negative_control_event_ensemble.csv", parse_dates=["predicted_event_time"])
+    randomized_events = randomized_events[
+        randomized_events["source_name"].eq("sun")
+        & randomized_events["control_type"].eq("randomized_time")
+        & randomized_events["frequency_band"].isin(args.frequencies)
+        & randomized_events["antenna"].astype(str).isin(set(args.antennas))
+    ].reset_index(drop=True)
+    randomized_stack = fast_stack_summary(
+        clean,
+        randomized_events,
+        args.window,
+        by=["source_name", "frequency_band", "antenna", "control_type", "control_id"],
+    )
+    randomized_stack.to_csv(controls_dir / "sun_randomized_stack_summary.csv", index=False)
+
     quality = event_window_quality(clean, sun_events, args.window)
     burst = event_burst_metrics(clean, sun_events, args.window)
     block = block_jackknife_from_profiles(sun_profiles)
-    source_level = aggregate_source_level(sun_events, sun_scored, sun_stack, quality, block, window_s=args.window)
+    source_level = aggregate_source_level(
+        sun_events,
+        sun_scored,
+        sun_stack,
+        quality,
+        block,
+        randomized_stack=randomized_stack,
+        window_s=args.window,
+    )
     source_level = add_offsource_pvalues(source_level, off_stack)
     coherence = _frequency_antenna_coherence(source_level)
     clusters = date_cluster_summary(sun_scored, burst)
@@ -340,6 +295,7 @@ def main() -> None:
         f"- Moving-source controls: `{controls_dir / 'sun_offephemeris_controls.csv'}`",
         f"- Off-ephemeris event table: `{controls_dir / 'sun_offephemeris_predicted_events.csv'}`",
         f"- Off-ephemeris stack summary: `{controls_dir / 'sun_offephemeris_stack_summary.csv'}`",
+        f"- Randomized stack summary: `{controls_dir / 'sun_randomized_stack_summary.csv'}`",
         f"- Event-type split stacks and plots: `{assets}`",
         f"- Event thumbnails: `{assets / 'event_thumbnails'}`",
         f"- Burst metrics: `{out_root / 'sun_event_burst_metrics.csv'}`",

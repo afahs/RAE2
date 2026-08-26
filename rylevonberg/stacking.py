@@ -220,3 +220,81 @@ def stack_profiles(profile_df: pd.DataFrame, by: list[str] | None = None, seed: 
             }
         )
     return add_frequency_mhz_column(stacked), add_frequency_mhz_column(pd.DataFrame.from_records(summary_rows))
+
+
+def fast_stack_summary(
+    clean_df: pd.DataFrame,
+    events_df: pd.DataFrame,
+    window_seconds: float,
+    by: list[str] | None = None,
+    baseline_mode: str = "linear_all",
+    sideband_exclusion_seconds: float = 120.0,
+) -> pd.DataFrame:
+    """Compute stack summaries without materializing aligned profile rows.
+
+    Additional grouping columns such as ``control_id`` keep randomized
+    realizations separate, yielding the null distribution required for a
+    stack-level empirical p-value.
+    """
+    if events_df.empty:
+        return pd.DataFrame()
+    group_cols = list(by or ["source_name", "frequency_band", "antenna"])
+    clean_groups = {
+        (freq, antenna): group.sort_values("time").reset_index(drop=True)
+        for (freq, antenna), group in clean_df.groupby(["frequency_band", "antenna"], dropna=False, sort=True)
+    }
+    accum: dict[tuple[object, ...], dict[str, object]] = {}
+    for _, event in events_df.iterrows():
+        freq = event.get("frequency_band")
+        antenna = event.get("antenna")
+        group = clean_groups.get((freq, antenna))
+        if group is None or group.empty:
+            continue
+        times = pd.DatetimeIndex(group["time"])
+        time_ns = datetime_ns(times)
+        event_ns = pd.Timestamp(event["predicted_event_time"]).value
+        half_ns = int(float(window_seconds) * 1e9)
+        lo = int(np.searchsorted(time_ns, event_ns - half_ns, side="left"))
+        hi = int(np.searchsorted(time_ns, event_ns + half_ns, side="right"))
+        if hi <= lo:
+            continue
+        local = group.iloc[lo:hi]
+        relative_seconds = (datetime_ns(local["time"]) - event_ns).astype(float) / 1e9
+        values = pd.to_numeric(local["power"], errors="coerce").to_numpy(dtype=float)
+        valid = local["is_valid"].to_numpy(dtype=bool) if "is_valid" in local else np.ones(len(local), dtype=bool)
+        keep = valid & np.isfinite(values) & (np.abs(relative_seconds) <= float(window_seconds))
+        if np.count_nonzero(keep) < 6:
+            continue
+        profile, template, _, _ = detrend_profile_values(
+            relative_seconds[keep],
+            values[keep],
+            str(event["event_type"]),
+            baseline_mode=baseline_mode,
+            sideband_exclusion_seconds=sideband_exclusion_seconds,
+            normalize=True,
+        )
+        key = tuple(event.get(column) for column in group_cols)
+        slot = accum.setdefault(key, {"values": [], "templates": [], "events": set()})
+        slot["values"].append(profile)
+        slot["templates"].append(template)
+        slot["events"].add((event.get("event_id"), str(event.get("predicted_event_time"))))
+
+    rows: list[dict[str, object]] = []
+    for key, slot in accum.items():
+        values = np.concatenate(slot["values"]) if slot["values"] else np.array([], dtype=float)
+        template = np.concatenate(slot["templates"]) if slot["templates"] else np.array([], dtype=float)
+        denominator = float(np.dot(template, template))
+        amplitude = float(np.dot(values, template) / denominator) if denominator > 0 else np.nan
+        sigma = robust_sigma(values)
+        snr = float(amplitude * np.sqrt(denominator) / sigma) if np.isfinite(sigma) and sigma > 0 else np.nan
+        rows.append(
+            {
+                **dict(zip(group_cols, key)),
+                "n_events": int(len(slot["events"])),
+                "stacked_amplitude": amplitude,
+                "stacked_snr": snr,
+                "bootstrap_std": np.nan,
+                "jackknife_std": np.nan,
+            }
+        )
+    return add_frequency_mhz_column(pd.DataFrame.from_records(rows))

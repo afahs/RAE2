@@ -61,4 +61,23 @@ def test_offset_unit_vectors_tangent_preserves_unit_norm_and_offset_scale() -> N
     shifted = offset_unit_vectors_tangent(base, east_offset_deg=1.0)
     assert np.isclose(np.linalg.norm(shifted[0]), 1.0)
     sep = np.degrees(np.arccos(np.clip(np.dot(base[0], shifted[0]), -1.0, 1.0)))
-    assert 0.9 < sep < 1.1
+    assert np.isclose(sep, 1.0, atol=1e-10)
+
+
+def test_offset_unit_vectors_tangent_is_exact_for_large_diagonal_offset() -> None:
+    import numpy as np
+
+    base = np.array([[1.0, 0.0, 0.0]])
+    shifted = offset_unit_vectors_tangent(base, east_offset_deg=12.0, north_offset_deg=16.0)
+    sep = np.degrees(np.arccos(np.clip(np.dot(base[0], shifted[0]), -1.0, 1.0)))
+
+    assert np.isclose(np.linalg.norm(shifted[0]), 1.0)
+    assert np.isclose(sep, 20.0, atol=1e-10)
+
+
+def test_offset_unit_vectors_tangent_rejects_nonfinite_offsets() -> None:
+    import numpy as np
+    import pytest
+
+    with pytest.raises(ValueError, match="must be finite"):
+        offset_unit_vectors_tangent(np.array([[1.0, 0.0, 0.0]]), east_offset_deg=np.nan)

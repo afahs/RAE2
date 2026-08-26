@@ -5,7 +5,12 @@ import pandas as pd
 
 from rylevonberg.offsource import OffsourceConfig, generate_offsource_controls
 from rylevonberg.quality import event_window_quality
-from rylevonberg.source_summary import add_offsource_pvalues, aggregate_source_level, final_source_summary
+from rylevonberg.source_summary import (
+    add_offsource_pvalues,
+    add_randomized_stack_pvalues,
+    aggregate_source_level,
+    final_source_summary,
+)
 
 
 def test_generate_offsource_controls_has_required_metadata() -> None:
@@ -138,7 +143,17 @@ def test_source_level_summary_and_offsource_pvalue() -> None:
     quality = pd.DataFrame(
         [{"source_name": "earth", "frequency_band": 7, "antenna": "rv2_coarse", "primary_quality_failure": ""}]
     )
-    level = aggregate_source_level(events, scored, stack, quality=quality, window_s=600)
+    randomized = pd.DataFrame(
+        {
+            "source_name": ["earth"] * 20,
+            "frequency_band": [7] * 20,
+            "antenna": ["rv2_coarse"] * 20,
+            "control_type": ["randomized_time_stack"] * 20,
+            "control_id": range(20),
+            "stacked_snr": np.linspace(-2.0, 2.0, 20),
+        }
+    )
+    level = aggregate_source_level(events, scored, stack, quality=quality, randomized_stack=randomized, window_s=600)
     off = pd.DataFrame(
         {
             "parent_source": ["earth", "earth"],
@@ -151,6 +166,44 @@ def test_source_level_summary_and_offsource_pvalue() -> None:
     final = final_source_summary(level)
     assert level.iloc[0]["offsource_empirical_p"] < 1.0
     assert final.iloc[0]["final_status"] == "positive_control_confirmed"
+
+
+def test_source_level_randomized_p_uses_stack_distribution_not_best_event_p() -> None:
+    events = pd.DataFrame(
+        {
+            "source_name": ["sun", "sun"],
+            "predicted_event_time": pd.to_datetime(["1974-01-01", "1974-01-02"]),
+            "frequency_band": [7, 7],
+            "antenna": ["rv2_coarse", "rv2_coarse"],
+        }
+    )
+    scored = events.copy()
+    scored["detection_snr"] = [5.0, 6.0]
+    scored["best_empirical_p"] = [0.001, 0.002]
+    stack = pd.DataFrame(
+        [{"source_name": "sun", "frequency_band": 7, "antenna": "rv2_coarse", "stacked_snr": 8.0}]
+    )
+    randomized = pd.DataFrame(
+        {
+            "source_name": ["sun"] * 4,
+            "frequency_band": [7.0] * 4,
+            "antenna": ["rv2_coarse"] * 4,
+            "control_type": ["randomized_time_stack"] * 4,
+            "stacked_snr": [9.0, -10.0, 1.0, 2.0],
+        }
+    )
+
+    level = aggregate_source_level(events, scored, stack, randomized_stack=randomized)
+
+    assert level.iloc[0]["randomized_empirical_p"] == 0.6
+
+
+def test_missing_stack_null_does_not_fall_back_to_event_pvalues() -> None:
+    source_level = pd.DataFrame([{"source": "sun", "frequency_band": 7, "antenna": "rv2_coarse", "stacked_snr": 8.0}])
+
+    result = add_randomized_stack_pvalues(source_level, pd.DataFrame())
+
+    assert np.isnan(result.iloc[0]["randomized_empirical_p"])
 
 
 def test_offsource_pvalue_matches_equivalent_numeric_band_dtypes() -> None:

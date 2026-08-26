@@ -7,7 +7,7 @@ import pytest
 from rylevonberg.controls import injection_recovery, randomized_event_times, time_reversed_events
 from rylevonberg.detection import StepFitConfig
 from rylevonberg.jobs import require_interactive_mode
-from rylevonberg.stacking import aligned_profiles, stack_profiles
+from rylevonberg.stacking import aligned_profiles, fast_stack_summary, stack_profiles
 
 
 def _mini_data():
@@ -29,6 +29,32 @@ def test_stack_profiles_outputs_summary() -> None:
     assert not summary.empty
 
 
+def test_fast_stack_summary_keeps_randomized_realizations_separate() -> None:
+    clean, events = _mini_data()
+    controls = pd.concat(
+        [
+            events.assign(control_type="randomized_time", control_id=0),
+            events.assign(
+                predicted_event_time=events["predicted_event_time"] + pd.Timedelta(minutes=1),
+                control_type="randomized_time",
+                control_id=1,
+            ),
+        ],
+        ignore_index=True,
+    )
+
+    summary = fast_stack_summary(
+        clean,
+        controls,
+        window_seconds=300,
+        by=["source_name", "frequency_band", "antenna", "control_type", "control_id"],
+    )
+
+    assert len(summary) == 2
+    assert set(summary["control_id"]) == {0, 1}
+    assert summary["stacked_snr"].notna().all()
+
+
 def test_controls_and_job_guard() -> None:
     clean, events = _mini_data()
     rand = randomized_event_times(events, clean["time"].min(), clean["time"].max(), seed=1)
@@ -40,4 +66,3 @@ def test_controls_and_job_guard() -> None:
     assert require_interactive_mode("interactive") == "interactive"
     with pytest.raises(RuntimeError):
         require_interactive_mode("sbatch")
-
