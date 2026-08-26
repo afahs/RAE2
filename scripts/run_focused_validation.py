@@ -202,7 +202,7 @@ def _generate_cyg_offsource(
     off_dir = ensure_dir(out_root / "controls" / "cyg_a_offsource")
     events_path = off_dir / "predicted_events.csv"
     states_path = off_dir / "limb_visibility_states.csv"
-    if events_path.exists() and states_path.exists() and not args.force_cyg_predict:
+    if events_path.exists() and not args.force_cyg_predict:
         cached = _read_csv(events_path, parse_dates=["predicted_event_time"])
         required = {"source_name", "predicted_event_time", "frequency_band", "antenna", "parent_source"}
         if required.issubset(cached.columns):
@@ -224,7 +224,8 @@ def _generate_cyg_offsource(
         how="left",
     )
     events.to_csv(events_path, index=False)
-    states.to_csv(states_path, index=False)
+    if args.write_cyg_limb_states:
+        states.to_csv(states_path, index=False)
     return events
 
 
@@ -604,6 +605,7 @@ def main() -> None:
     parser.add_argument("--prediction-cadence-seconds", type=float, default=300.0)
     parser.add_argument("--windows", nargs="+", type=float, default=[600.0, 900.0])
     parser.add_argument("--force-cyg-predict", action="store_true")
+    parser.add_argument("--write-cyg-limb-states", action="store_true")
     parser.add_argument("--force-offsource-stacks", action="store_true")
     parser.add_argument("--n-random-stack-controls", type=int, default=20)
     parser.add_argument("--force-randomized-stacks", action="store_true")
@@ -669,6 +671,7 @@ def main() -> None:
             "windows": args.windows,
             "prediction_cadence_seconds": args.prediction_cadence_seconds,
             "force_cyg_predict": args.force_cyg_predict,
+            "write_cyg_limb_states": args.write_cyg_limb_states,
             "force_offsource_stacks": args.force_offsource_stacks,
             "n_random_stack_controls": args.n_random_stack_controls,
             "force_randomized_stacks": args.force_randomized_stacks,

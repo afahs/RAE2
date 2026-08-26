@@ -1,112 +1,130 @@
 # RAE-2 Development Handoff — 2026-08-26
 
-## Repository topology
+## Repository state
 
-- `/global/u2/a/afahs/RAE2` is the original `main` worktree. It is intentionally
-  analysis-heavy (about 7.9 GB), has many historical tracked deletions, and is
-  not safe to commit or merge wholesale.
-- `/global/u2/a/afahs/RAE2_github_upload` is a linked, source-only Git worktree
-  (about 3.5 MB). It was clean at the start of this audit and is the right base
-  for continued GitHub development.
-- Maintenance work from this audit is isolated on
-  `codex/rae2-cleanup-20260826`; nothing was pushed to GitHub.
+- Live analysis tree: `/global/u2/a/afahs/RAE2/RyleVonberg`
+- Source-only Git worktree: `/global/u2/a/afahs/RAE2_github_upload`
+- Approved correctness fixes were fast-forwarded into `publish-rylevonberg` at
+  `ffd34a0`.
+- Continued code work is isolated on `codex/rae2-development-20260826`
+  through `b3594f6`; the branch also includes the final handoff update.
+- Nothing was pushed to GitHub.
+- Use `module load python/3.12`; Perlmutter's stock `/usr/bin/python3` is
+  Python 3.6 and is unsupported for this project.
 
-## Verified state
+## Validation
 
-- Supported Perlmutter environment: `module load python/3.12`.
-- Source-only worktree after fixes: `99 passed`.
-- Live analysis tree after the same fixes: `119 passed`.
-- Both trees compile successfully under Python 3.12.
-- The default `/usr/bin/python3` is Python 3.6.15 and must not be used for this
-  project.
-- The package is not installed in the stock Python module. Either install it in
-  an isolated environment as documented in `README.md`, or use `PYTHONPATH=.`
-  when running a repository script directly.
+- Source-only worktree: `129 passed`.
+- Live analysis tree: `129 passed`.
+- Both trees are free of `__pycache__` and `.pytest_cache` after validation.
+- `validate_timeseries` is intentionally unchanged; its current behavior was
+  explicitly accepted for this development sequence.
 
-## Correctness fixes applied
+## Completed correctness and audit work
 
-1. `find_limb_transitions` now requires two adjacent finite limb angles and
-   valid timestamps. Previously, a missing angle was converted to `False` by
-   comparison and could create a false disappearance/reappearance pair.
-2. `add_offsource_pvalues` now compares frequency bands numerically when
-   possible. Previously, equivalent values such as integer `7` and float `7.0`
-   failed a string comparison and silently removed all controls for that row.
+1. `find_limb_transitions` ignores missing adjacent limb samples.
+2. Off-source frequency matching treats equivalent numeric band dtypes
+   consistently.
+3. Moving-source controls now use an exact spherical exponential-map offset.
+   A 12° east / 16° north request is tested to produce an exact 20° great-circle
+   separation.
+4. Source-level randomized p-values now compare the real stack with complete
+   randomized stack realizations. Event-level minimum p-values are no longer
+   substituted for a stack null.
+5. Every randomized summary records `control_id` and `n_input_events`;
+   incomplete/capped realizations are rejected during aggregation.
+6. Optional missing scoring columns no longer crash source aggregation.
+7. Detection grading no longer emits all-NaN reduction warnings when both
+   methods are unavailable.
+8. Focused validation reuses verified Cyg event/off-source and complete-null
+   caches, with force flags for intentional regeneration. The 109 MB Cyg limb
+   state intermediary is no longer required for cache reuse and is written
+   only with `--write-cyg-limb-states`.
+9. All 12 live-only scripts and 7 live-only tests were audited and ported in
+   topical commits. Three Perlmutter-only fallback paths were replaced with the
+   portable `RAE2_MASTER_CSV` / `data/interpolatedRAE2MasterFile.csv`
+   convention.
 
-Both fixes have regression tests.
+## Complete-control regrade
 
-## Open audit findings
+Twenty full randomized realizations were generated per analysis. The minimum
+resolvable empirical p-value is therefore `1/21 = 0.047619`.
 
-These are not changed because they affect scientific selection or historical
-result reproducibility and need an explicit analysis decision.
+- Earth: `positive_control_confirmed`; strongest stack SNR `19.27`,
+  randomized p `0.047619`.
+- Sun: focused classification `systematic_like` and unified status
+  `likely_systematic`; strongest stack SNR `-8.47`, randomized p
+  `0.095238`, moving off-ephemeris p `0.235294`.
+- Jupiter: `unresolved`; strongest stack SNR `3.06`, randomized p
+  `0.047619`. This remains a potential/episodic diagnostic, not a detection.
+- Cyg A: `unresolved`; the strongest 900 s stack is large but does not pass
+  all timing/randomized/off-source gates.
 
-1. `validate_timeseries` labels every value at or above each group's 99.99th
-   percentile as `saturation_or_nonpositive`. This guarantees that legitimate
-   maxima can be rejected even when no instrument saturation occurred. Replace
-   the percentile rule with a documented receiver limit, or rename/split the
-   flag and validate its impact.
-2. `offset_unit_vectors_tangent` uses a first-order tangent-plane displacement
-   followed by normalization. At the 10–20 degree moving-control offsets used
-   by the Sun analysis, the realized great-circle separation is slightly
-   smaller than requested. An exact spherical offset would change control
-   tracks and requires regeneration of affected products.
-3. `aggregate_source_level` sets `randomized_empirical_p` to the minimum
-   event-level empirical p-value in a channel. This is not a stack-level
-   empirical p-value and is sensitive to multiple comparisons. Detection
-   grading should use a control distribution of the complete stack statistic.
-4. Older plot inventories and handoff notes point to PNGs removed by a previous
-   generated-output cleanup. The confirmation CSVs remain; source inspection
-   plots were rebuilt during this audit. Treat the rebuilt README as current.
-5. The live analysis tree contains 12 scripts and 7 tests that are not in the
-   source-only worktree. They all pass in the live tree, but should be reviewed
-   and ported in a dedicated commit rather than copied wholesale.
+Authoritative tables:
 
-## Unpublished live-only files
-
-Scripts:
-
-- `investigate_earth_noise_geography.py`
-- `investigate_lower_v_lunar_reflection_interference.py`
-- `ocr_warwick_dulk_riddle_and_match_rae2.py`
-- `plot_all_frontside_signal_vs_water.py`
-- `plot_jupiter_burst_count_vs_cml.py`
-- `plot_lunar_reflection_data_views.py`
-- `plot_lunar_reflection_interference_results.py`
-- `plot_pass_signal_vs_visible_water.py`
-- `plot_warwick_dulk_riddle_catalog_phase_cml.py`
-- `plot_wdr_rae2_5min_all_frequency_samples.py`
-- `run_naive_subspacecraft_land_ocean.py`
-- `run_rae2_lunar_reflection_feasibility.py`
-
-Tests observed only in the live tree:
-
-- `test_all_frontside_signal_vs_water.py`
-- `test_earth_noise_geography.py`
-- `test_lunar_reflection_interference.py`
-- `test_naive_subspacecraft_land_ocean.py`
-- `test_visible_water_signal.py`
-- `test_warwick_dulk_riddle_catalog_phase_cml.py`
-- `test_warwick_dulk_riddle_ocr_match.py`
+- `outputs/summary/source_level_results.csv`
+- `outputs/summary/source_final_summary.csv`
+- `outputs/sun_focused_validation/sun_source_level_results.csv`
+- `outputs/sun_focused_validation/controls/sun_randomized_stack_summary.csv`
+- `outputs/focused_validation/jupiter_randomized_stack_summary_600s.csv`
+- `outputs/focused_validation/jupiter_randomized_stack_summary_900s.csv`
 
 ## Curated figures
 
-The reviewed plot set and provenance notes are in:
+The selected eight-figure set is in:
 
 `/global/u2/a/afahs/RAE2/RyleVonberg/outputs/curated_best_plots_20260826`
 
-Jupiter is labeled as potential/unconfirmed, the IMP-6 absolute map scale is
-labeled provisional, and the Sun figures carry the newer control caveat in the
-folder README.
+It contains Earth occultation profiles and diffraction comparisons, relative
+and provisional absolute sky maps, two potential/unconfirmed Jupiter
+diagnostics, and two explicitly Sun-labelled control figures. Read that
+folder's `README.md` for provenance and scientific caveats.
 
-## Recommended next development sequence
+## Cleanup completed
 
-1. Review and merge `codex/rae2-cleanup-20260826` into the normal development
-   branch after inspecting the two correctness fixes.
-2. Port the 19 live-only scripts/tests in small topical commits, starting with
-   the Earth geography and Jupiter catalog work; run the full suite after each.
-3. Resolve the percentile-based saturation flag before regenerating detection
-   claims.
-4. Define a stack-level empirical null and rerun Sun/Jupiter grading.
-5. Regenerate moving-source controls if the tangent offset is replaced with an
-   exact spherical construction.
-6. Keep generated outputs out of Git and record every promoted figure's source
-   table, run configuration, code commit, and caveat in its README.
+Deleted only products demonstrated to be temporary or superseded:
+
+- `outputs/earth_noise_geography_smoke`
+- `outputs/lower_v_lunar_reflection_interference_smoke`
+- `outputs/lower_v_lunar_reflection_interference_smoke2`
+- `outputs/upper_v_novaco_brown_scan_maps_raw_master_smoke_v1`
+- `outputs/upper_v_novaco_brown_scan_maps_rv1_coarse_earthbeam90_smoke_v1`
+- `outputs/upper_v_novaco_brown_scan_maps_rv1_fine_sunveto10db_destripe_smoke_v1`
+- `outputs/upper_v_novaco_brown_scan_maps_smoke_v1`
+- `outputs/focused_validation/controls/cyg_a_offsource/limb_visibility_states.csv`
+
+The directories were smoke runs capped at 50,000 rows, minimal bands, or a
+handful of events and were superseded by production runs. The Cyg limb-state
+CSV was an unused 109 MB cache intermediary; the reusable predicted-event
+table remains. Deleted products can be regenerated from their scripts. Raw
+data, production outputs, and historical reports were preserved.
+
+The refreshed cleanup report is:
+
+`reports/cleanup_generated_outputs/cleanup_generated_outputs_report.md`
+
+Current inventory: 480 image-like files (129,539,960 bytes), 96 NPY tables
+(5,605,071,538 bytes), five CSVs above 10 MB (196,444,752 bytes), and no empty
+output directories.
+
+## Development commits
+
+- `ec832f0` — exact moving controls and stack-level nulls
+- `68c4cc5` — Earth geography diagnostics
+- `7e1a356` — lunar reflection diagnostics
+- `51f1e70` — Jupiter catalog diagnostics
+- `843bbbb` — resumable focused-validation caches
+- `b3594f6` — complete randomized stack controls and NaN-safe grading
+
+## Recommended next sequence
+
+1. Review `codex/rae2-development-20260826` and merge it into
+   `publish-rylevonberg`; push only after review.
+2. If finer p-value resolution is needed, raise complete randomized controls
+   above 20 and run via a checkpointed/batch implementation.
+3. Investigate why the large Cyg A stack fails the full control set before
+   treating it as source-like.
+4. Keep Jupiter labelled potential/unconfirmed and pursue the episodic
+   Io-phase/burst tests rather than a continuum detection claim.
+5. Keep the IMP-6 absolute sky-map calibration labelled provisional until an
+   independent calibration audit is completed.

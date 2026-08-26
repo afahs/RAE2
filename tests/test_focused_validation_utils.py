@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import argparse
+
 import numpy as np
 import pandas as pd
 
@@ -11,7 +13,7 @@ from rylevonberg.source_summary import (
     aggregate_source_level,
     final_source_summary,
 )
-from scripts.run_focused_validation import _offsource_stacks
+from scripts.run_focused_validation import _generate_cyg_offsource, _offsource_stacks
 
 
 def test_generate_offsource_controls_has_required_metadata() -> None:
@@ -260,6 +262,38 @@ def test_offsource_stack_builder_reuses_complete_cached_windows(tmp_path, monkey
 
     assert len(result) == 2
     assert set(result["window_s"]) == {600.0, 900.0}
+
+
+def test_cyg_event_cache_does_not_require_large_limb_state_table(tmp_path, monkeypatch) -> None:
+    off_dir = tmp_path / "controls" / "cyg_a_offsource"
+    off_dir.mkdir(parents=True)
+    cached = pd.DataFrame(
+        {
+            "source_name": ["cyg_a_off_annulus_00"],
+            "predicted_event_time": pd.to_datetime(["1974-01-01"]),
+            "frequency_band": [1],
+            "antenna": ["rv1_coarse"],
+            "parent_source": ["cyg_a"],
+        }
+    )
+    cached.to_csv(off_dir / "predicted_events.csv", index=False)
+    sources = pd.DataFrame(
+        [{"source_name": "cyg_a", "kind": "fixed", "ra_deg": 299.9, "dec_deg": 40.7, "frame": "fk4"}]
+    )
+
+    def fail_if_predicted(*args, **kwargs):
+        raise AssertionError("valid cached events should avoid event prediction")
+
+    monkeypatch.setattr("scripts.run_focused_validation.predict_events", fail_if_predicted)
+    result = _generate_cyg_offsource(
+        pd.DataFrame(),
+        sources,
+        tmp_path,
+        argparse.Namespace(force_cyg_predict=False),
+    )
+
+    assert len(result) == 1
+    assert not (off_dir / "limb_visibility_states.csv").exists()
 
 
 def test_offsource_pvalue_matches_equivalent_numeric_band_dtypes() -> None:
