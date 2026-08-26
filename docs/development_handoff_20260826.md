@@ -7,15 +7,20 @@
 - Approved correctness fixes were fast-forwarded into `publish-rylevonberg` at
   `ffd34a0`.
 - Continued code work is isolated on `codex/rae2-development-20260826`
-  through `b3594f6`; the branch also includes the final handoff update.
+  through `b312e9b`; the branch also includes the final handoff update.
+- The source-only worktree is clean. The outer `/global/u2/a/afahs/RAE2`
+  checkout remains intentionally unnormalized: 3,671 tracked deletions, four
+  modifications, and 27 untracked entries spanning unrelated legacy
+  `RAE2Agent` and digitization work pre-dated this audit. They were preserved
+  rather than reset, staged, or deleted without project-owner review.
 - Nothing was pushed to GitHub.
 - Use `module load python/3.12`; Perlmutter's stock `/usr/bin/python3` is
   Python 3.6 and is unsupported for this project.
 
 ## Validation
 
-- Source-only worktree: `129 passed`.
-- Live analysis tree: `129 passed`.
+- Source-only worktree: `130 passed`.
+- Live analysis tree: `130 passed`.
 - Both trees are free of `__pycache__` and `.pytest_cache` after validation.
 - `validate_timeseries` is intentionally unchanged; its current behavior was
   explicitly accepted for this development sequence.
@@ -92,19 +97,26 @@ Deleted only products demonstrated to be temporary or superseded:
 - `outputs/upper_v_novaco_brown_scan_maps_rv1_fine_sunveto10db_destripe_smoke_v1`
 - `outputs/upper_v_novaco_brown_scan_maps_smoke_v1`
 - `outputs/focused_validation/controls/cyg_a_offsource/limb_visibility_states.csv`
+- `outputs/focused_validation/controls/cyg_a_offsource/limb_visibility_states.npy`
+- `outputs/sun_focused_validation/controls/sun_offephemeris_predicted_events.npy`
+- `outputs/finite_duration_stackfit_fornax_allfreq_v1/finite_duration_stack_profiles.npy`
 
 The directories were smoke runs capped at 50,000 rows, minimal bands, or a
 handful of events and were superseded by production runs. The Cyg limb-state
-CSV was an unused 109 MB cache intermediary; the reusable predicted-event
-table remains. Deleted products can be regenerated from their scripts. Raw
-data, production outputs, and historical reports were preserved.
+tables were unused cache intermediaries; the reusable predicted-event table
+remains. The Sun NPY was stale by 100 rows after exact-geometry regeneration,
+so the current CSV was preserved. The 416.7 MB Fornax array was an old,
+regenerable sample-level intermediate outside the active Earth/Sun/Jupiter
+sequence; its run configuration, binned stacks, summary, and report remain.
+Deleted products can be regenerated from their scripts. Raw data, final
+summaries, curated plots, and historical reports were preserved.
 
 The refreshed cleanup report is:
 
 `reports/cleanup_generated_outputs/cleanup_generated_outputs_report.md`
 
-Current inventory: 480 image-like files (129,539,960 bytes), 96 NPY tables
-(5,605,071,538 bytes), five CSVs above 10 MB (196,444,752 bytes), and no empty
+Current inventory: 480 image-like files (129,539,960 bytes), 93 NPY tables
+(5,114,187,425 bytes), four CSVs above 10 MB (87,451,935 bytes), and no empty
 output directories.
 
 ## Development commits
@@ -115,6 +127,7 @@ output directories.
 - `51f1e70` — Jupiter catalog diagnostics
 - `843bbbb` — resumable focused-validation caches
 - `b3594f6` — complete randomized stack controls and NaN-safe grading
+- `b312e9b` — remove the unused Cyg limb-state cache dependency
 
 ## Recommended next sequence
 
