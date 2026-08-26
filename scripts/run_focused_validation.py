@@ -178,11 +178,24 @@ def _existing_randomized_stacks(clean: pd.DataFrame, root: Path, source: str, wi
     )
 
 
-def _generate_cyg_offsource(clean: pd.DataFrame, source_list: pd.DataFrame, out_root: Path, args: argparse.Namespace) -> pd.DataFrame:
+def _generate_cyg_offsource(
+    clean: pd.DataFrame,
+    source_list: pd.DataFrame,
+    out_root: Path,
+    args: argparse.Namespace,
+) -> pd.DataFrame:
     controls_all = generate_offsource_controls(source_list, OffsourceConfig())
     controls_path = ensure_dir(out_root / "controls") / "offsource_controls.csv"
     controls_all.to_csv(controls_path, index=False)
     cyg_controls = controls_all[controls_all["parent_source"].eq("cyg_a")].reset_index(drop=True)
+    off_dir = ensure_dir(out_root / "controls" / "cyg_a_offsource")
+    events_path = off_dir / "predicted_events.csv"
+    states_path = off_dir / "limb_visibility_states.csv"
+    if events_path.exists() and states_path.exists() and not args.force_cyg_predict:
+        cached = _read_csv(events_path, parse_dates=["predicted_event_time"])
+        required = {"source_name", "predicted_event_time", "frequency_band", "antenna", "parent_source"}
+        if required.issubset(cached.columns):
+            return cached
     events, states = predict_events(
         clean,
         cyg_controls,
@@ -199,15 +212,28 @@ def _generate_cyg_offsource(clean: pd.DataFrame, source_list: pd.DataFrame, out_
         on="source_name",
         how="left",
     )
-    off_dir = ensure_dir(out_root / "controls" / "cyg_a_offsource")
-    events.to_csv(off_dir / "predicted_events.csv", index=False)
-    states.to_csv(off_dir / "limb_visibility_states.csv", index=False)
+    events.to_csv(events_path, index=False)
+    states.to_csv(states_path, index=False)
     return events
 
 
-def _offsource_stacks(clean: pd.DataFrame, off_events: pd.DataFrame, out_root: Path, windows: list[float]) -> pd.DataFrame:
+def _offsource_stacks(
+    clean: pd.DataFrame,
+    off_events: pd.DataFrame,
+    out_root: Path,
+    windows: list[float],
+    force: bool = False,
+) -> pd.DataFrame:
     tables = []
     off_dir = ensure_dir(out_root / "controls" / "cyg_a_offsource")
+    all_path = off_dir / "offsource_stack_summary_all.csv"
+    if all_path.exists() and not force:
+        cached = _read_csv(all_path)
+        required = {"source_name", "parent_source", "frequency_band", "antenna", "window_s", "stacked_snr"}
+        if required.issubset(cached.columns):
+            cached_windows = set(pd.to_numeric(cached["window_s"], errors="coerce").dropna())
+            if set(float(value) for value in windows).issubset(cached_windows):
+                return cached[cached["window_s"].isin(windows)].reset_index(drop=True)
     for window in windows:
         profiles = aligned_profiles(clean, off_events, window_seconds=window, bin_seconds=60.0)
         _, summary = stack_profiles(profiles, by=["source_name", "frequency_band", "antenna"], n_bootstrap=20)
@@ -221,7 +247,7 @@ def _offsource_stacks(clean: pd.DataFrame, off_events: pd.DataFrame, out_root: P
             summary.to_csv(off_dir / f"offsource_stack_summary_{int(window)}s.csv", index=False)
             tables.append(summary)
     out = pd.concat(tables, ignore_index=True) if tables else pd.DataFrame()
-    out.to_csv(off_dir / "offsource_stack_summary_all.csv", index=False)
+    out.to_csv(all_path, index=False)
     return out
 
 
@@ -544,6 +570,8 @@ def main() -> None:
     parser.add_argument("--output-root", default="outputs/focused_validation")
     parser.add_argument("--prediction-cadence-seconds", type=float, default=300.0)
     parser.add_argument("--windows", nargs="+", type=float, default=[600.0, 900.0])
+    parser.add_argument("--force-cyg-predict", action="store_true")
+    parser.add_argument("--force-offsource-stacks", action="store_true")
     args = parser.parse_args()
 
     out_root = ensure_dir(args.output_root)
@@ -552,7 +580,13 @@ def main() -> None:
     clean = _read_csv(args.cleaned, parse_dates=["time"])
     sources = load_source_list(args.sources)
     off_events = _generate_cyg_offsource(clean, sources, out_root, args)
-    off_summary = _offsource_stacks(clean, off_events, out_root, args.windows)
+    off_summary = _offsource_stacks(
+        clean,
+        off_events,
+        out_root,
+        args.windows,
+        force=args.force_offsource_stacks,
+    )
 
     source_rows: list[pd.DataFrame] = []
     _earth_report(clean, Path(args.earth_root), out_reports, source_rows)
@@ -575,6 +609,8 @@ def main() -> None:
             "jupiter_root": args.jupiter_root,
             "windows": args.windows,
             "prediction_cadence_seconds": args.prediction_cadence_seconds,
+            "force_cyg_predict": args.force_cyg_predict,
+            "force_offsource_stacks": args.force_offsource_stacks,
         },
     )
     print("offsource_controls: outputs/focused_validation/controls/offsource_controls.csv")

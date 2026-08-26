@@ -11,6 +11,7 @@ from rylevonberg.source_summary import (
     aggregate_source_level,
     final_source_summary,
 )
+from scripts.run_focused_validation import _offsource_stacks
 
 
 def test_generate_offsource_controls_has_required_metadata() -> None:
@@ -204,6 +205,31 @@ def test_missing_stack_null_does_not_fall_back_to_event_pvalues() -> None:
     result = add_randomized_stack_pvalues(source_level, pd.DataFrame())
 
     assert np.isnan(result.iloc[0]["randomized_empirical_p"])
+
+
+def test_offsource_stack_builder_reuses_complete_cached_windows(tmp_path, monkeypatch) -> None:
+    off_dir = tmp_path / "controls" / "cyg_a_offsource"
+    off_dir.mkdir(parents=True)
+    cached = pd.DataFrame(
+        {
+            "source_name": ["cyg_control_1", "cyg_control_1"],
+            "parent_source": ["cyg_a", "cyg_a"],
+            "frequency_band": [1, 1],
+            "antenna": ["rv1_coarse", "rv1_coarse"],
+            "window_s": [600.0, 900.0],
+            "stacked_snr": [1.0, 2.0],
+        }
+    )
+    cached.to_csv(off_dir / "offsource_stack_summary_all.csv", index=False)
+
+    def fail_if_recomputed(*args, **kwargs):
+        raise AssertionError("aligned profiles should not be rebuilt when the cache is complete")
+
+    monkeypatch.setattr("scripts.run_focused_validation.aligned_profiles", fail_if_recomputed)
+    result = _offsource_stacks(pd.DataFrame(), pd.DataFrame(), tmp_path, [600.0, 900.0])
+
+    assert len(result) == 2
+    assert set(result["window_s"]) == {600.0, 900.0}
 
 
 def test_offsource_pvalue_matches_equivalent_numeric_band_dtypes() -> None:
