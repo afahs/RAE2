@@ -64,26 +64,31 @@ def _read(path: Path, parse_dates: list[str] | None = None) -> pd.DataFrame:
     return read_table(resolved, parse_dates=parse_dates, low_memory=False)
 
 
-def _default_event_path(source: str) -> Path | None:
+def _default_event_path(source: str, input_root: Path | None = None) -> Path | None:
+    root = Path(input_root) if input_root is not None else INPUT_ROOT
     if source == "sun":
-        return SUN_EVENTS
+        return root / SUN_EVENTS.name
     if source in OUTER_PLANETS:
-        return OUTER_PLANET_EVENTS
+        return root / OUTER_PLANET_EVENTS.name
     if source in PLANETS:
-        return PLANET_EVENTS
+        return root / PLANET_EVENTS.name
     if source == "vir_a":
-        return VIRGO_EVENTS
+        return root / VIRGO_EVENTS.name
     if source in BRIGHT_SOURCES:
-        return BRIGHT_EVENTS
+        return root / BRIGHT_EVENTS.name
     return None
 
 
-def load_events_for_source(source: str, event_tables: list[Path] | None = None) -> tuple[pd.DataFrame, list[str]]:
+def load_events_for_source(
+    source: str,
+    event_tables: list[Path] | None = None,
+    input_root: Path | None = None,
+) -> tuple[pd.DataFrame, list[str]]:
     """Load source rows without mixing filtered and unfiltered event suites."""
 
     paths = list(event_tables or [])
     if not paths:
-        default = _default_event_path(source)
+        default = _default_event_path(source, input_root)
         paths = [default] if default is not None else []
     frames = []
     used = []
@@ -399,6 +404,7 @@ def main() -> None:
     parser.add_argument("--cleaned", default=str(CLEAN))
     parser.add_argument("--profiles", default="", help="Resume plotting from an existing occultogram event-profile table")
     parser.add_argument("--event-table", action="append", default=[], help="Optional event table(s) used for every requested source")
+    parser.add_argument("--input-root", default=str(INPUT_ROOT), help="Directory holding the per-source event tables (for example runtime_inputs/occultogram_v2)")
     parser.add_argument("--sources", default=",".join(DEFAULT_SOURCES))
     parser.add_argument("--out-dir", default=str(ROOT / "outputs/occultograms_morphology_v1"))
     parser.add_argument("--window-s", type=float, default=2400.0)
@@ -445,7 +451,7 @@ def main() -> None:
     source_status = []
     all_events = []
     for source in sources:
-        events, used_paths = load_events_for_source(source, event_tables)
+        events, used_paths = load_events_for_source(source, event_tables, Path(args.input_root))
         source_status.append({"source_name": source, "n_event_rows": int(len(events)), "event_tables": used_paths})
         if not events.empty:
             all_events.append(events)
@@ -476,6 +482,8 @@ def main() -> None:
         {
             "sources": sources,
             "cleaned": str(args.cleaned),
+            "input_root": str(args.input_root),
+            "event_tables": [str(value) for value in args.event_table],
             "window_seconds": config.window_seconds,
             "bin_seconds": config.bin_seconds,
             "sideband_start_seconds": config.sideband_start_seconds,

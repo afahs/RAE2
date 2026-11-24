@@ -361,40 +361,76 @@ def cmd_run_smoke(args: argparse.Namespace) -> dict[str, str]:
     return outputs
 
 
+def _select_existing_events(args: argparse.Namespace, out_dir: Path) -> dict[str, str]:
+    """Copy the requested source/channel rows of a predicted-event table.
+
+    Used instead of ``predict`` when current-geometry events already exist,
+    so that every later stage sees exactly the reviewed event set.
+    """
+    events = read_table(args.events, parse_dates=["predicted_event_time"])
+    require_current_geometry(events)
+    names = [s.lower() for s in (_list_arg(args.source) or [])]
+    if names:
+        events = events[events["source_name"].astype(str).str.lower().isin(names)]
+    freqs = [int(v) for v in _list_arg(args.frequency) or []]
+    if freqs:
+        events = events[pd.to_numeric(events["frequency_band"], errors="coerce").isin(freqs)]
+    ants = _list_arg(args.antenna)
+    if ants:
+        events = events[events["antenna"].astype(str).isin(ants)]
+    if events.empty:
+        raise ValueError(f"no events in {args.events} match the requested sources/frequencies/antennas")
+    out = ensure_dir(out_dir)
+    events_path = out / "predicted_events.csv"
+    write_table(events.reset_index(drop=True), events_path, index=False)
+    write_json(out / "run_metadata_predict.json", {"stage": "predict", "reused_events": str(args.events), "args": vars(args), "versions": software_versions()})
+    return {"predicted_events": str(events_path)}
+
+
 def cmd_run_control_survey(args: argparse.Namespace) -> dict[str, str]:
     """Run the Earth/Sun control-validation workflow over an extended date range."""
     require_interactive_mode(args.run_mode)
     root = ensure_dir(args.output_dir)
     outputs: dict[str, str] = {}
-    ingest_args = argparse.Namespace(
-        data=args.data,
-        start=args.start,
-        end=args.end,
-        output_dir=str(root / "01_ingest"),
-        value_columns=args.value_columns,
-        gap_factor=args.gap_factor,
-        artifact_sigma=args.artifact_sigma,
-        saturation_power=getattr(args, "saturation_power", None),
-        run_mode=args.run_mode,
-    )
-    outputs.update(cmd_ingest(ingest_args))
-    pred_args = argparse.Namespace(
-        cleaned=outputs["cleaned_timeseries"],
-        sources=args.sources,
-        source=args.source,
-        frequency=args.frequency,
-        antenna=args.antenna,
-        output_dir=str(root / "02_events"),
-        frame=args.frame,
-        equinox=args.equinox,
-        ephemeris=args.ephemeris,
-        max_gap_seconds=args.max_gap_seconds,
-        prediction_cadence_seconds=args.prediction_cadence_seconds,
-        exclude_limb_source=getattr(args, "exclude_limb_source", None),
-        exclude_limb_deg=getattr(args, "exclude_limb_deg", None),
-        run_mode=args.run_mode,
-    )
-    outputs.update(cmd_predict(pred_args))
+    if getattr(args, "cleaned", None):
+        # Reuse an already ingested table; it must carry the current flags.
+        _read_current_cleaned(args.cleaned)
+        outputs["cleaned_timeseries"] = str(args.cleaned)
+    else:
+        if not getattr(args, "data", None):
+            raise ValueError("run-control-survey needs --data, or --cleaned with an ingested table")
+        ingest_args = argparse.Namespace(
+            data=args.data,
+            start=args.start,
+            end=args.end,
+            output_dir=str(root / "01_ingest"),
+            value_columns=args.value_columns,
+            gap_factor=args.gap_factor,
+            artifact_sigma=args.artifact_sigma,
+            saturation_power=getattr(args, "saturation_power", None),
+            run_mode=args.run_mode,
+        )
+        outputs.update(cmd_ingest(ingest_args))
+    if getattr(args, "events", None):
+        outputs.update(_select_existing_events(args, root / "02_events"))
+    else:
+        pred_args = argparse.Namespace(
+            cleaned=outputs["cleaned_timeseries"],
+            sources=args.sources,
+            source=args.source,
+            frequency=args.frequency,
+            antenna=args.antenna,
+            output_dir=str(root / "02_events"),
+            frame=args.frame,
+            equinox=args.equinox,
+            ephemeris=args.ephemeris,
+            max_gap_seconds=args.max_gap_seconds,
+            prediction_cadence_seconds=args.prediction_cadence_seconds,
+            exclude_limb_source=getattr(args, "exclude_limb_source", None),
+            exclude_limb_deg=getattr(args, "exclude_limb_deg", None),
+            run_mode=args.run_mode,
+        )
+        outputs.update(cmd_predict(pred_args))
     predicted_events = read_table(outputs["predicted_events"], parse_dates=["predicted_event_time"])
     stack_events_path = outputs["predicted_events"]
     if args.max_stack_events_per_group:
@@ -504,8 +540,8 @@ def build_parser() -> argparse.ArgumentParser:
     def common_run(sp: argparse.ArgumentParser) -> None:
         sp.add_argument("--run-mode", default="local", help="Allowed: local, interactive, salloc, srun-interactive. Batch modes fail.")
 
-    def common_io(sp: argparse.ArgumentParser) -> None:
-        sp.add_argument("--data", required=True)
+    def common_io(sp: argparse.ArgumentParser, data_required: bool = True) -> None:
+        sp.add_argument("--data", required=data_required)
         sp.add_argument("--start")
         sp.add_argument("--end")
         sp.add_argument("--output-dir", required=True)
@@ -634,7 +670,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.set_defaults(func=cmd_run_smoke)
 
     sp = sub.add_parser("run-control-survey")
-    common_io(sp)
+    common_io(sp, data_required=False)
+    sp.add_argument("--cleaned", help="Already ingested time series with current quality flags; skips ingest.")
+    sp.add_argument("--events", help="Current-geometry predicted events; skips predict and keeps the requested sources/channels.")
     sp.add_argument("--sources", default=str(Path(__file__).resolve().parents[1] / "configs" / "bright_sources.csv"))
     sp.add_argument("--source", nargs="*", default=["earth", "sun"])
     sp.add_argument("--frequency", nargs="*", default=[str(v) for v in range(1, 10)])
