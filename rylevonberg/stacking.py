@@ -8,7 +8,7 @@ import pandas as pd
 from .constants import add_frequency_mhz_column
 from .detection import baseline_matrix, event_template
 from .sample_quality import add_strict_valid_column
-from .util import datetime_ns, robust_sigma
+from .util import datetime_ns, jackknife_standard_error, robust_sigma
 
 DEFAULT_BASELINE_MODE = "joint_step_linear"
 STACK_PROCESSING_VERSION = "source_preserving_v4_ephemeris"
@@ -259,7 +259,7 @@ def stack_profiles(profile_df: pd.DataFrame, by: list[str] | None = None, seed: 
                 "stacked_amplitude": amp,
                 "stacked_snr": snr,
                 "bootstrap_std": float(np.std(boots, ddof=1)) if len(boots) > 1 else np.nan,
-                "jackknife_std": float(np.std(jack, ddof=1)) if len(jack) > 1 else np.nan,
+                "jackknife_std": jackknife_standard_error(jack),
             }
         )
     return add_frequency_mhz_column(stacked), add_frequency_mhz_column(pd.DataFrame.from_records(summary_rows))

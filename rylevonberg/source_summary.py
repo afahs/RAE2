@@ -7,7 +7,7 @@ import pandas as pd
 
 from .constants import add_frequency_mhz_column
 from .scoring import _empirical_pvalue
-from .util import robust_sigma
+from .util import jackknife_standard_error, robust_sigma
 
 
 def _mad(values: pd.Series) -> float:
@@ -56,7 +56,7 @@ def block_jackknife_from_profiles(profile_df: pd.DataFrame, by: list[str] | None
             {
                 **meta,
                 "n_date_blocks": int(grp["date_block"].nunique()),
-                "block_jackknife_std": float(np.std(estimates, ddof=1)) if len(estimates) > 1 else np.nan,
+                "block_jackknife_std": jackknife_standard_error(estimates),
                 "max_block_leverage": float(np.nanmax(np.abs(np.asarray(estimates) - full))) if estimates and np.isfinite(full) else np.nan,
             }
         )

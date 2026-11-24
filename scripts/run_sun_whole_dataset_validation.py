@@ -22,7 +22,7 @@ from rylevonberg.quality import event_window_quality
 from rylevonberg.solar_controls import MovingBodyOffsetConfig, event_burst_metrics, generate_moving_body_offset_controls
 from rylevonberg.sources import load_source_list
 from rylevonberg.stacking import detrend_profile_values
-from rylevonberg.util import datetime_ns, ensure_dir, robust_sigma, write_json
+from rylevonberg.util import datetime_ns, ensure_dir, jackknife_standard_error, robust_sigma, write_json
 
 
 def _read(path: str | Path, **kwargs) -> pd.DataFrame:
@@ -155,7 +155,7 @@ def _stack_summary_fast(
                 "n_month_blocks": int(len(slot["blocks"])),
                 "stacked_amplitude": amp,
                 "stacked_snr": snr,
-                "month_jackknife_std": float(np.std(jack, ddof=1)) if len(jack) > 1 else np.nan,
+                "month_jackknife_std": jackknife_standard_error(jack),
                 "max_month_leverage": max_lev,
             }
         )

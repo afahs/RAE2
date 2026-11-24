@@ -61,6 +61,21 @@ def robust_sigma(values: np.ndarray) -> float:
     return std if np.isfinite(std) else float("nan")
 
 
+def jackknife_standard_error(leave_one_out: np.ndarray | list[float]) -> float:
+    """Delete-one jackknife standard error from the leave-one-out estimates.
+
+    SE = sqrt((n - 1) / n * sum((theta_i - mean)^2)). The plain spread of the
+    leave-one-out estimates is ~sqrt(n) times too small, because each estimate
+    shares n - 1 of its n inputs with every other one.
+    """
+    vals = np.asarray(leave_one_out, dtype=float)
+    vals = vals[np.isfinite(vals)]
+    n = vals.size
+    if n < 2:
+        return float("nan")
+    return float(np.sqrt((n - 1) / n * np.sum((vals - vals.mean()) ** 2)))
+
+
 def datetime_ns(values: pd.Series | pd.DatetimeIndex | np.ndarray) -> np.ndarray:
     """Return timestamps as integer nanoseconds, independent of pandas storage unit."""
     return pd.DatetimeIndex(values).to_numpy(dtype="datetime64[ns]").astype("int64")
