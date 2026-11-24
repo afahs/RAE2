@@ -163,7 +163,7 @@ def specular_reflection_geometry(
     """
     spacecraft = np.asarray(spacecraft_position_km, dtype=float)
     earth_unit = normalize_vectors(earth_unit_vector_from_moon)
-    earth = earth_unit * float(earth_moon_distance_km)
+    earth = earth_unit * np.asarray(earth_moon_distance_km)[..., None]
     sc_unit = normalize_vectors(spacecraft)
     radius = float(moon_radius_km)
 
@@ -279,10 +279,11 @@ def specular_reflection_geometry(
 def tangent_proxy_path_km(
     spacecraft_position_km: np.ndarray,
     earth_unit_vector_from_moon: np.ndarray,
+    earth_moon_distance_km: float | np.ndarray = EARTH_MOON_DISTANCE_KM,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Flat-surface proxy retained as a sanity check, not the science model."""
     spacecraft = np.asarray(spacecraft_position_km, dtype=float)
-    earth_dir = earth_direction_from_spacecraft(spacecraft, earth_unit_vector_from_moon)
+    earth_dir = earth_direction_from_spacecraft(spacecraft, earth_unit_vector_from_moon, earth_moon_distance_km)
     local_up = normalize_vectors(spacecraft)
     altitude = np.linalg.norm(spacecraft, axis=1) - MOON_RADIUS_KM
     sin_elevation = np.einsum("ij,ij->i", earth_dir, local_up)
@@ -408,12 +409,15 @@ def collect_reflection_samples(
                     continue
 
             spacecraft = local[SPACECRAFT_COLUMNS].to_numpy(dtype=float)
-            earth_unit = local[EARTH_UNIT_COLUMNS].to_numpy(dtype=float)
-            earth_dir = earth_direction_from_spacecraft(spacecraft, earth_unit)
+            from rylevonberg.frames import body_positions_from_moon
+            earth_position = body_positions_from_moon("earth", local["time"])
+            earth_distance = np.linalg.norm(earth_position, axis=1)
+            earth_unit = normalize_vectors(earth_position)
+            earth_dir = normalize_vectors(earth_position - spacecraft)
             limb_angle = moon_limb_angle_deg(spacecraft, earth_dir)
 
             if geometry_model == "tangent_proxy":
-                delta_l, reflection_valid = tangent_proxy_path_km(spacecraft, earth_unit)
+                delta_l, reflection_valid = tangent_proxy_path_km(spacecraft, earth_unit, earth_distance)
                 geom = {
                     "delta_l_km": delta_l,
                     "reflection_valid": reflection_valid,
@@ -428,7 +432,7 @@ def collect_reflection_samples(
                     "source_angle_path_derivative_km_per_rad": np.full(len(local), np.nan),
                 }
             elif geometry_model == "spherical_specular":
-                geom = specular_reflection_geometry(spacecraft, earth_unit)
+                geom = specular_reflection_geometry(spacecraft, earth_unit, earth_moon_distance_km=earth_distance)
             else:
                 raise ValueError(f"Unsupported geometry model: {geometry_model}")
 

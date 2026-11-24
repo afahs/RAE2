@@ -67,3 +67,4 @@ def add_frequency_mhz_column(df):
 
 DEFAULT_FRAME = "fk4"
 DEFAULT_EQUINOX = "B1950"
+GEOMETRY_VERSION = "independent_body_ephemeris_v1"

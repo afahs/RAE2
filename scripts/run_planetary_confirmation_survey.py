@@ -76,7 +76,7 @@ def _aggregate_for_specs(
     events: pd.DataFrame,
     windows: list[float],
     timing_offset: float = 0.0,
-    baseline_mode: str = "sideband_linear",
+    baseline_mode: str = "joint_step_linear",
     sideband_exclusion_seconds: float = 120.0,
 ) -> pd.DataFrame:
     rows = []
@@ -280,7 +280,7 @@ def main() -> None:
     parser.add_argument("--timing-offsets", nargs="+", type=float, default=[-600, -510, -420, -330, -240, -180, -150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150, 180, 240, 330, 420, 510, 600])
     parser.add_argument("--prediction-cadence-seconds", type=float, default=300.0)
     parser.add_argument("--strict-min-side-samples", type=int, default=20)
-    parser.add_argument("--baseline-mode", default="sideband_linear", choices=["linear_all", "constant_all", "sideband_linear", "sideband_constant", "joint_step_linear", "pre_event_anchor"])
+    parser.add_argument("--baseline-mode", default="joint_step_linear", choices=["linear_all", "constant_all", "sideband_linear", "sideband_constant", "joint_step_linear", "pre_event_anchor"])
     parser.add_argument("--sideband-exclusion-seconds", type=float, default=120.0)
     parser.add_argument(
         "--sun-exclude-earth-limb-deg",

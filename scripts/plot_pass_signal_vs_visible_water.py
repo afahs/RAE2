@@ -52,9 +52,8 @@ def observer_geometry(passes: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
         passes["subspacecraft_lat_deg"].to_numpy(dtype=float),
     )
     spacecraft = passes[SPACECRAFT_COLUMNS].to_numpy(dtype=float)
-    moon_to_earth = passes[EARTH_UNIT_COLUMNS].to_numpy(dtype=float, copy=True)
-    moon_to_earth /= np.linalg.norm(moon_to_earth, axis=1, keepdims=True)
-    earth_to_spacecraft = -float(EARTH_MOON_DISTANCE_KM) * moon_to_earth + spacecraft
+    from rylevonberg.frames import body_vectors_from_spacecraft
+    earth_to_spacecraft = -body_vectors_from_spacecraft("earth", passes["center_time"], spacecraft)
     distances = np.linalg.norm(earth_to_spacecraft, axis=1)
     return directions, distances
 

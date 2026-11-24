@@ -14,14 +14,15 @@ def _boolean_series(series: pd.Series) -> np.ndarray:
 
 def strict_power_mask(
     frame: pd.DataFrame,
-    upper_clip_quantile: float = 0.9999,
+    upper_clip_quantile: float = 0.0,
     upper_clip_sigma: float = 12.0,
     use_existing_valid: bool = True,
 ) -> np.ndarray:
     """Return a conservative sample mask for raw radiometer power.
 
     The mask rejects samples that are non-finite, nonpositive, already flagged
-    invalid, or at/above the channel's high-end clipping threshold.  It is
+    invalid. Quantile clipping is an explicit sensitivity option, disabled by
+    default because high amplitude alone is not evidence of bad telemetry. It is
     intentionally row-level: event windows should drop bad points first, then
     allow existing minimum-sample cuts to reject windows that lose too many
     points.
@@ -53,7 +54,7 @@ def strict_power_mask(
 def add_strict_valid_column(
     frame: pd.DataFrame,
     column: str = "strict_is_valid",
-    upper_clip_quantile: float = 0.9999,
+    upper_clip_quantile: float = 0.0,
     upper_clip_sigma: float = 12.0,
 ) -> pd.DataFrame:
     """Return a copy with a strict row-level validity column."""

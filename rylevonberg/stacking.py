@@ -10,22 +10,51 @@ from .detection import baseline_matrix, event_template
 from .sample_quality import add_strict_valid_column
 from .util import datetime_ns, robust_sigma
 
+DEFAULT_BASELINE_MODE = "joint_step_linear"
+STACK_PROCESSING_VERSION = "source_preserving_v4_ephemeris"
+
+
+def _stack_estimate(values: np.ndarray, template: np.ndarray) -> tuple[float, float]:
+    """Project the signal and estimate noise from the fitted residual.
+
+    Including the fitted signal in the noise scale makes the score saturate
+    as a source brightens. This remains an empirical control-calibrated score,
+    not a Gaussian significance for correlated spacecraft samples.
+    """
+    denominator = float(np.dot(template, template))
+    amplitude = float(np.dot(values, template) / denominator) if denominator > 0 else np.nan
+    sigma = robust_sigma(values - amplitude * template)
+    floor = 64 * np.finfo(float).eps * max(1., float(np.max(np.abs(values)))) if len(values) else np.inf
+    snr = float(amplitude * np.sqrt(denominator) / sigma) if np.isfinite(sigma) and sigma > floor else np.nan
+    return amplitude, snr
+
+
+def stack_cache_matches(frame: pd.DataFrame, window_seconds: float,
+                        baseline_mode: str = DEFAULT_BASELINE_MODE,
+                        sideband_exclusion_seconds: float = 120.0) -> bool:
+    """Reject legacy summaries and caches using different processing settings."""
+    required = {"stack_processing_version", "baseline_mode", "window_s", "sideband_exclusion_seconds"}
+    return bool(not frame.empty and required.issubset(frame.columns)
+                and frame["stack_processing_version"].eq(STACK_PROCESSING_VERSION).all()
+                and frame["baseline_mode"].eq(baseline_mode).all()
+                and np.isclose(pd.to_numeric(frame["window_s"], errors="coerce"), window_seconds).all()
+                and np.isclose(pd.to_numeric(frame["sideband_exclusion_seconds"], errors="coerce"), sideband_exclusion_seconds).all())
+
 
 def detrend_profile_values(
     t_rel_sec: np.ndarray,
     values: np.ndarray,
     event_type: str,
-    baseline_mode: str = "sideband_linear",
+    baseline_mode: str = DEFAULT_BASELINE_MODE,
     sideband_exclusion_seconds: float = 120.0,
     timing_offset_sec: float = 0.0,
     normalize: bool = True,
 ) -> tuple[np.ndarray, np.ndarray, float, int]:
     """Return detrended profile values and template for one event window.
 
-    `sideband_linear` is the science default for profile stacks: it fits the
-    baseline outside the central occultation region so the baseline cannot
-    directly absorb the predicted step. `linear_all` is retained for legacy
-    comparisons.
+    The default jointly fits the predicted step and a linear baseline, then
+    subtracts only the baseline. Explicit sideband_linear/linear_all modes
+    retain the legacy attenuation for sensitivity comparisons.
     """
     tr = np.asarray(t_rel_sec, dtype=float)
     y = np.asarray(values, dtype=float)
@@ -79,23 +108,18 @@ def detrend_profile_values(
     else:
         raise ValueError(f"unknown baseline_mode: {baseline_mode}")
     sigma = robust_sigma(residual_for_sigma)
+    if np.isfinite(sigma) and sigma <= 64 * np.finfo(float).eps * max(1., float(np.max(np.abs(y)))):
+        sigma = np.nan  # Do not amplify floating-point residuals of exact fits.
     if normalize and np.isfinite(sigma) and sigma > 0:
         profile = profile / sigma
     return profile, template, float(sigma) if np.isfinite(sigma) else np.nan, int(np.count_nonzero(fit_mask))
 
 
-def aligned_profiles(
-    clean_df: pd.DataFrame,
-    events_df: pd.DataFrame,
-    window_seconds: float = 600.0,
-    bin_seconds: float = 30.0,
-    normalize: bool = True,
-    baseline_mode: str = "sideband_linear",
-    sideband_exclusion_seconds: float = 120.0,
-) -> pd.DataFrame:
-    rows = []
+def _iter_profile_windows(clean_df, events_df, window_seconds, normalize,
+                          baseline_mode, sideband_exclusion_seconds):
+    """One extraction/mask/detrending path shared by target and control stacks."""
     if events_df.empty:
-        return pd.DataFrame()
+        return
     groups = {
         (freq, antenna): add_strict_valid_column(group.sort_values("time").reset_index(drop=True))
         for (freq, antenna), group in clean_df.groupby(["frequency_band", "antenna"], dropna=False, sort=True)
@@ -139,6 +163,22 @@ def aligned_profiles(
             sideband_exclusion_seconds=sideband_exclusion_seconds,
             normalize=normalize,
         )
+        yield ev, tr, yd, tmpl, sig, n_baseline
+
+
+def aligned_profiles(
+    clean_df: pd.DataFrame,
+    events_df: pd.DataFrame,
+    window_seconds: float = 600.0,
+    bin_seconds: float = 30.0,
+    normalize: bool = True,
+    baseline_mode: str = DEFAULT_BASELINE_MODE,
+    sideband_exclusion_seconds: float = 120.0,
+) -> pd.DataFrame:
+    rows = []
+    for ev, tr, yd, tmpl, sig, n_baseline in _iter_profile_windows(
+        clean_df, events_df, window_seconds, normalize, baseline_mode, sideband_exclusion_seconds
+    ):
         tb = np.round(tr / float(bin_seconds)) * float(bin_seconds)
         for trel, tbin, val, tv in zip(tr, tb, yd, tmpl):
             rows.append({
@@ -148,6 +188,9 @@ def aligned_profiles(
                 "profile_value": float(val),
                 "template": float(tv),
                 "baseline_mode": str(baseline_mode),
+                "stack_processing_version": STACK_PROCESSING_VERSION,
+                "window_s": float(window_seconds),
+                "sideband_exclusion_seconds": float(sideband_exclusion_seconds),
                 "n_baseline_samples": int(n_baseline),
                 "baseline_sigma": float(sig) if np.isfinite(sig) else np.nan,
             })
@@ -171,7 +214,9 @@ def stack_profiles(profile_df: pd.DataFrame, by: list[str] | None = None, seed: 
                 "n_events": int(grp["event_id"].nunique()),
                 "mean": float(np.mean(vals)),
                 "median": float(np.median(vals)),
-                "ivar_mean": float(np.average(vals)),
+                # Profiles are already normalized by each event's residual
+                # sigma, so equal weights are the inverse-variance weights.
+                "ivar_mean": float(np.mean(vals)),
                 "sem": float(np.std(vals, ddof=1) / np.sqrt(vals.size)) if vals.size > 1 else np.nan,
             }
         )
@@ -185,10 +230,7 @@ def stack_profiles(profile_df: pd.DataFrame, by: list[str] | None = None, seed: 
         meta = dict(zip(group_cols, keys))
         vals = grp["profile_value"].to_numpy(dtype=float)
         tmpl = grp["template"].to_numpy(dtype=float)
-        denom = float(np.dot(tmpl, tmpl))
-        amp = float(np.dot(vals, tmpl) / denom) if denom > 0 else np.nan
-        sig = robust_sigma(vals)
-        snr = float(amp * np.sqrt(denom) / sig) if np.isfinite(sig) and sig > 0 else np.nan
+        amp, snr = _stack_estimate(vals, tmpl)
         boots = []
         event_ids = grp["event_id"].drop_duplicates().to_numpy()
         if n_bootstrap > 0 and event_ids.size > 1:
@@ -213,6 +255,7 @@ def stack_profiles(profile_df: pd.DataFrame, by: list[str] | None = None, seed: 
             {
                 **meta,
                 "n_events": int(event_ids.size),
+                **{c: grp[c].iloc[0] for c in ("baseline_mode", "stack_processing_version", "window_s", "sideband_exclusion_seconds") if c in grp},
                 "stacked_amplitude": amp,
                 "stacked_snr": snr,
                 "bootstrap_std": float(np.std(boots, ddof=1)) if len(boots) > 1 else np.nan,
@@ -227,7 +270,7 @@ def fast_stack_summary(
     events_df: pd.DataFrame,
     window_seconds: float,
     by: list[str] | None = None,
-    baseline_mode: str = "linear_all",
+    baseline_mode: str = DEFAULT_BASELINE_MODE,
     sideband_exclusion_seconds: float = 120.0,
 ) -> pd.DataFrame:
     """Compute stack summaries without materializing aligned profile rows.
@@ -240,40 +283,10 @@ def fast_stack_summary(
         return pd.DataFrame()
     group_cols = list(by or ["source_name", "frequency_band", "antenna"])
     input_counts = events_df.groupby(group_cols, dropna=False, sort=False).size().to_dict()
-    clean_groups = {
-        (freq, antenna): group.sort_values("time").reset_index(drop=True)
-        for (freq, antenna), group in clean_df.groupby(["frequency_band", "antenna"], dropna=False, sort=True)
-    }
     accum: dict[tuple[object, ...], dict[str, object]] = {}
-    for _, event in events_df.iterrows():
-        freq = event.get("frequency_band")
-        antenna = event.get("antenna")
-        group = clean_groups.get((freq, antenna))
-        if group is None or group.empty:
-            continue
-        times = pd.DatetimeIndex(group["time"])
-        time_ns = datetime_ns(times)
-        event_ns = pd.Timestamp(event["predicted_event_time"]).value
-        half_ns = int(float(window_seconds) * 1e9)
-        lo = int(np.searchsorted(time_ns, event_ns - half_ns, side="left"))
-        hi = int(np.searchsorted(time_ns, event_ns + half_ns, side="right"))
-        if hi <= lo:
-            continue
-        local = group.iloc[lo:hi]
-        relative_seconds = (datetime_ns(local["time"]) - event_ns).astype(float) / 1e9
-        values = pd.to_numeric(local["power"], errors="coerce").to_numpy(dtype=float)
-        valid = local["is_valid"].to_numpy(dtype=bool) if "is_valid" in local else np.ones(len(local), dtype=bool)
-        keep = valid & np.isfinite(values) & (np.abs(relative_seconds) <= float(window_seconds))
-        if np.count_nonzero(keep) < 6:
-            continue
-        profile, template, _, _ = detrend_profile_values(
-            relative_seconds[keep],
-            values[keep],
-            str(event["event_type"]),
-            baseline_mode=baseline_mode,
-            sideband_exclusion_seconds=sideband_exclusion_seconds,
-            normalize=True,
-        )
+    for event, _, profile, template, _, _ in _iter_profile_windows(
+        clean_df, events_df, window_seconds, True, baseline_mode, sideband_exclusion_seconds
+    ):
         key = tuple(event.get(column) for column in group_cols)
         slot = accum.setdefault(key, {"values": [], "templates": [], "events": set()})
         slot["values"].append(profile)
@@ -284,14 +297,15 @@ def fast_stack_summary(
     for key, slot in accum.items():
         values = np.concatenate(slot["values"]) if slot["values"] else np.array([], dtype=float)
         template = np.concatenate(slot["templates"]) if slot["templates"] else np.array([], dtype=float)
-        denominator = float(np.dot(template, template))
-        amplitude = float(np.dot(values, template) / denominator) if denominator > 0 else np.nan
-        sigma = robust_sigma(values)
-        snr = float(amplitude * np.sqrt(denominator) / sigma) if np.isfinite(sigma) and sigma > 0 else np.nan
+        amplitude, snr = _stack_estimate(values, template)
         rows.append(
             {
                 **dict(zip(group_cols, key)),
-                "n_input_events": int(input_counts.get(key, 0)),
+                "n_input_events": int(input_counts.get(key if len(key) > 1 else key[0], 0)),
+                "baseline_mode": baseline_mode,
+                "stack_processing_version": STACK_PROCESSING_VERSION,
+                "window_s": float(window_seconds),
+                "sideband_exclusion_seconds": float(sideband_exclusion_seconds),
                 "n_events": int(len(slot["events"])),
                 "stacked_amplitude": amplitude,
                 "stacked_snr": snr,
@@ -308,7 +322,7 @@ def randomized_stack_distribution(
     window_seconds: float,
     n_random: int = 30,
     seed: int = 12345,
-    baseline_mode: str = "linear_all",
+    baseline_mode: str = DEFAULT_BASELINE_MODE,
     sideband_exclusion_seconds: float = 120.0,
 ) -> pd.DataFrame:
     """Build complete randomized-time stack realizations.

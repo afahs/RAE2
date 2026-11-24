@@ -7,6 +7,8 @@ import pandas as pd
 
 from rylevonberg.offsource import OffsourceConfig, generate_offsource_controls
 from rylevonberg.quality import event_window_quality
+from rylevonberg.stacking import STACK_PROCESSING_VERSION
+from rylevonberg.constants import GEOMETRY_VERSION
 from rylevonberg.source_summary import (
     add_offsource_pvalues,
     add_randomized_stack_pvalues,
@@ -249,6 +251,9 @@ def test_offsource_stack_builder_reuses_complete_cached_windows(tmp_path, monkey
             "frequency_band": [1, 1],
             "antenna": ["rv1_coarse", "rv1_coarse"],
             "window_s": [600.0, 900.0],
+            "stack_processing_version": [STACK_PROCESSING_VERSION] * 2,
+            "baseline_mode": ["joint_step_linear"] * 2,
+            "sideband_exclusion_seconds": [120.] * 2,
             "stacked_snr": [1.0, 2.0],
         }
     )
@@ -270,6 +275,7 @@ def test_cyg_event_cache_does_not_require_large_limb_state_table(tmp_path, monke
     cached = pd.DataFrame(
         {
             "source_name": ["cyg_a_off_annulus_00"],
+            "geometry_version": [GEOMETRY_VERSION],
             "predicted_event_time": pd.to_datetime(["1974-01-01"]),
             "frequency_band": [1],
             "antenna": ["rv1_coarse"],

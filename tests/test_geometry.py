@@ -33,3 +33,18 @@ def test_transition_finder_ignores_missing_limb_samples() -> None:
 
     assert len(events) == 1
     assert events.iloc[0]["predicted_event_time"] == pd.Timestamp("1974-01-01 00:02:30")
+
+
+def test_invalid_orbit_position_does_not_manufacture_source_events() -> None:
+    times = pd.date_range("1974-01-01", periods=3, freq="15s")
+    positions = np.array([[-1800., 2500., 0.], [-1000., 100., 0.], [-1800., 2500., 0.]])
+    directions = np.tile([1., 0., 0.], (3, 1))
+    limb = moon_limb_angle_deg(positions, directions)
+    assert np.isnan(limb[1])
+    assert limb[0] > 0 and limb[2] > 0
+    assert find_limb_transitions(times, limb).empty
+
+
+def test_zero_and_surface_orbit_positions_have_unknown_limb_angle() -> None:
+    positions = np.array([[0., 0., 0.], [1737.4, 0., 0.]])
+    assert np.isnan(moon_limb_angle_deg(positions, np.tile([-1., 0., 0.], (2, 1)))).all()

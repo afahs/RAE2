@@ -89,6 +89,17 @@ def _matching_control_rows(source_row: pd.Series, controls: pd.DataFrame) -> pd.
             sub = sub[sub["frequency_band"].astype(str) == str(source_row["frequency_band"])]
     if "antenna" in sub.columns and pd.notna(source_row.get("antenna")):
         sub = sub[sub["antenna"].astype(str) == str(source_row["antenna"])]
+    # Current targets must never receive a p-value from historical or
+    # differently processed controls, even outside the focused CLI workflow.
+    if "stack_processing_version" in sub and pd.isna(source_row.get("stack_processing_version")):
+        return sub.iloc[:0]
+    if pd.notna(source_row.get("stack_processing_version")):
+        for column in ("stack_processing_version", "baseline_mode", "window_s", "sideband_exclusion_seconds"):
+            if pd.notna(source_row.get(column)):
+                if column not in sub:
+                    return sub.iloc[:0]
+                sub = sub[sub[column].eq(source_row[column])]
+
     return sub
 
 
@@ -193,6 +204,7 @@ def aggregate_source_level(
             clean_events = int((q_sub.get("primary_quality_failure", "") == "").sum())
         clean_fraction = float(clean_events / len(q_sub)) if len(q_sub) else np.nan
         row = {
+            **{column: st[column] for column in ("stack_processing_version", "baseline_mode", "sideband_exclusion_seconds") if column in st},
             "source": source,
             "source_name": source,
             "frequency_band": freq,

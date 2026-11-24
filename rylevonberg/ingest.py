@@ -21,6 +21,15 @@ from .constants import (
 from .table_io import read_table
 from .util import append_flag, datetime_ns, robust_sigma
 
+QUALITY_POLICY_VERSION = "instrument_limits_v3_independent_earth"
+
+
+def require_current_quality(ts: pd.DataFrame) -> None:
+    """Prevent old Earth-field rejection flags from surviving a geometry repair."""
+    if not ts.empty and ("quality_policy_version" not in ts or
+                         not ts["quality_policy_version"].eq(QUALITY_POLICY_VERSION).all()):
+        raise ValueError("Stale quality flags: rerun ingest with independent Earth geometry before analysis")
+
 
 @dataclass(frozen=True)
 class IngestOptions:
@@ -30,6 +39,7 @@ class IngestOptions:
     gap_factor: float = 3.0
     artifact_sigma: float = 12.0
     use_existing_loader: bool = True
+    saturation_power: float | None = None
 
 
 def _try_existing_loader() -> object | None:
@@ -68,7 +78,9 @@ def load_raw_csv(
             pass
 
     df = read_table(csv_path, usecols=lambda col: col in set(columns), low_memory=False)
-    missing = sorted(set(columns) - set(df.columns))
+    # Archived Earth directions are optional diagnostic fields. Ephemeris
+    # geometry must not depend on their presence or validity.
+    missing = sorted(set(columns) - set(EARTH_UNIT_COLUMNS) - set(df.columns))
     if missing:
         raise ValueError(f"CSV is missing required columns: {missing}")
     df[TIME_COLUMN] = pd.to_datetime(df[TIME_COLUMN], errors="coerce")
@@ -102,16 +114,24 @@ def validate_timeseries(
     ts: pd.DataFrame,
     gap_factor: float = 3.0,
     artifact_sigma: float = 12.0,
+    saturation_power: float | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Attach validation flags and return row-level data plus a compact report."""
     out = ts.copy()
     out["quality_flags"] = ""
 
-    malformed = out["time"].isna() | out["power"].isna()
-    for col in SPACECRAFT_COLUMNS + EARTH_UNIT_COLUMNS:
+    if saturation_power is not None and (not np.isfinite(saturation_power) or saturation_power <= 0):
+        raise ValueError("saturation_power must be a positive instrument limit")
+    malformed = out["time"].isna() | ~np.isfinite(pd.to_numeric(out["power"], errors="coerce"))
+    for col in SPACECRAFT_COLUMNS:
         if col in out.columns:
             malformed = malformed | ~np.isfinite(pd.to_numeric(out[col], errors="coerce"))
     out["quality_flags"] = append_flag(out["quality_flags"], malformed.to_numpy(), "malformed")
+    archive_earth_bad = np.zeros(len(out), dtype=bool)
+    for col in EARTH_UNIT_COLUMNS:
+        if col in out:
+            archive_earth_bad |= ~np.isfinite(pd.to_numeric(out[col], errors="coerce").to_numpy())
+    out["quality_flags"] = append_flag(out["quality_flags"], archive_earth_bad, "archive_earth_invalid")
 
     dup = out.duplicated(subset=["time", FREQUENCY_COLUMN, "antenna"], keep=False)
     out["quality_flags"] = append_flag(out["quality_flags"], dup.to_numpy(), "duplicate_timestamp")
@@ -139,7 +159,12 @@ def validate_timeseries(
 
         values = group["power"].to_numpy(dtype=float)
         finite = np.isfinite(values)
-        sat = finite & ((values <= 0.0) | (values >= np.nanpercentile(values[finite], 99.99) if finite.any() else False))
+        # A percentile is not an instrument saturation level. In quantized
+        # channels it can mark an entire legitimate source-visible plateau.
+        sat = finite & (values <= 0.0)
+        if saturation_power is not None:
+            sat |= finite & (values >= float(saturation_power))
+        high = finite & (values >= np.percentile(values[finite], 99.99)) if finite.any() else finite
         diffs = np.diff(values)
         sig = robust_sigma(diffs)
         artifact = np.zeros(len(values), dtype=bool)
@@ -150,6 +175,7 @@ def validate_timeseries(
         out.loc[group.index, "quality_flags"] = append_flag(out.loc[group.index, "quality_flags"], gap_mask, "gap_after_previous")
         out.loc[group.index, "quality_flags"] = append_flag(out.loc[group.index, "quality_flags"], sat, "saturation_or_nonpositive")
         out.loc[group.index, "quality_flags"] = append_flag(out.loc[group.index, "quality_flags"], artifact, "telemetry_artifact_jump")
+        out.loc[group.index, "quality_flags"] = append_flag(out.loc[group.index, "quality_flags"], high, "high_power_percentile")
 
         report_rows.append(
             {
@@ -167,7 +193,12 @@ def validate_timeseries(
             }
         )
 
-    out["is_valid"] = out["quality_flags"].eq("")
+    # Amplitude/jump diagnostics alone cannot distinguish a burst or an edge
+    # from telemetry. Keep them for review, not automatic signal censorship.
+    out["is_valid"] = ~out["quality_flags"].str.contains(
+        "malformed|duplicate_timestamp|gap_after_previous|saturation_or_nonpositive", regex=True
+    )
+    out["quality_policy_version"] = QUALITY_POLICY_VERSION
     return out.reset_index(drop=True), pd.DataFrame.from_records(report_rows)
 
 
@@ -175,4 +206,5 @@ def ingest_csv(csv_path: str | Path, options: IngestOptions | None = None) -> tu
     opts = options or IngestOptions()
     raw = load_raw_csv(csv_path, opts)
     long_df = to_long_timeseries(raw, opts.value_columns)
-    return validate_timeseries(long_df, gap_factor=opts.gap_factor, artifact_sigma=opts.artifact_sigma)
+    return validate_timeseries(long_df, gap_factor=opts.gap_factor, artifact_sigma=opts.artifact_sigma,
+                               saturation_power=opts.saturation_power)

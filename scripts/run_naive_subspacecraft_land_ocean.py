@@ -53,7 +53,7 @@ DEFAULT_INPUT = Path(
 )
 DEFAULT_OUT = ROOT / "outputs/earth_naive_subspacecraft_land_ocean_v1"
 POWER_COLUMNS = ["rv1_coarse", "rv2_coarse"]
-GEOMETRY_COLUMNS = ["time", *SPACECRAFT_COLUMNS, *EARTH_UNIT_COLUMNS]
+GEOMETRY_COLUMNS = ["time", *SPACECRAFT_COLUMNS]
 
 
 def alignment_cosine(spacecraft: np.ndarray, moon_to_earth: np.ndarray) -> np.ndarray:
@@ -86,7 +86,8 @@ def find_frontside_passes(
     ):
         times_ns = chunk["time"].to_numpy(dtype="datetime64[ns]").astype(np.int64)
         spacecraft = chunk[SPACECRAFT_COLUMNS].to_numpy(dtype=float)
-        earth = chunk[EARTH_UNIT_COLUMNS].to_numpy(dtype=float)
+        from rylevonberg.frames import body_unit_vectors_from_moon
+        earth = body_unit_vectors_from_moon("earth", chunk["time"])
         cosine = alignment_cosine(spacecraft, earth)
         front = np.isfinite(cosine) & (cosine > 0.0)
 
@@ -159,9 +160,8 @@ def attach_subspacecraft_points(passes: pd.DataFrame, geojson: dict) -> pd.DataF
 
     iers.conf.auto_download = False
     spacecraft = passes[SPACECRAFT_COLUMNS].to_numpy(dtype=float)
-    earth = passes[EARTH_UNIT_COLUMNS].to_numpy(dtype=float, copy=True)
-    earth /= np.linalg.norm(earth, axis=1, keepdims=True)
-    earth_to_spacecraft = -float(EARTH_MOON_DISTANCE_KM) * earth + spacecraft
+    from rylevonberg.frames import body_vectors_from_spacecraft
+    earth_to_spacecraft = -body_vectors_from_spacecraft("earth", passes["center_time"], spacecraft)
     unit = earth_to_spacecraft / np.linalg.norm(earth_to_spacecraft, axis=1, keepdims=True)
     ra = np.degrees(np.arctan2(unit[:, 1], unit[:, 0])) % 360.0
     dec = np.degrees(np.arcsin(np.clip(unit[:, 2], -1.0, 1.0)))
@@ -220,7 +220,8 @@ def aggregate_pass_power(
             continue
         idx = np.flatnonzero(candidate)
         spacecraft = chunk.iloc[idx][SPACECRAFT_COLUMNS].to_numpy(dtype=float)
-        earth = chunk.iloc[idx][EARTH_UNIT_COLUMNS].to_numpy(dtype=float)
+        from rylevonberg.frames import body_unit_vectors_from_moon
+        earth = body_unit_vectors_from_moon("earth", chunk.iloc[idx]["time"])
         cosine = alignment_cosine(spacecraft, earth)
         aligned = cosine >= np.cos(np.deg2rad(float(max_alignment_angle_deg)))
         idx = idx[aligned]

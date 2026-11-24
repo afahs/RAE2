@@ -97,7 +97,8 @@ def test_new_moon_distance_wraps_around_synodic_month() -> None:
     assert np.allclose(distance, [0.0, 2.0, 1.0], atol=1e-6)
 
 
-def test_earth_beam_separation_uses_radec_axis_in_hours() -> None:
+def test_earth_beam_separation_uses_radec_axis_in_hours(monkeypatch) -> None:
+    monkeypatch.setattr(nb, "body_unit_vectors_from_spacecraft", lambda body,t,p: np.tile([1.,0,0],(len(t),1)))
     df = pd.DataFrame(
         {
             "right_ascension": [0.0, 6.0, 12.0],
@@ -110,12 +111,14 @@ def test_earth_beam_separation_uses_radec_axis_in_hours() -> None:
             "earth_unit_vector_z": [0.0, 0.0, 0.0],
         }
     )
+    df["time"] = pd.date_range("1974-01-01", periods=len(df), freq="1min")
     out, units = _attach_earth_beam_separation(df, "radec", "hours")
     assert units == "hours"
     assert np.allclose(out["earth_beam_separation_deg"], [0.0, 90.0, 180.0], atol=1e-6)
 
 
-def test_earth_beam_separation_can_use_radial_upper_axis() -> None:
+def test_earth_beam_separation_can_use_radial_upper_axis(monkeypatch) -> None:
+    monkeypatch.setattr(nb, "body_unit_vectors_from_spacecraft", lambda body,t,p: np.tile([1.,0,0],(len(t),1)))
     df = pd.DataFrame(
         {
             "right_ascension": [0.0, 0.0],
@@ -128,6 +131,7 @@ def test_earth_beam_separation_can_use_radial_upper_axis() -> None:
             "earth_unit_vector_z": [0.0, 0.0],
         }
     )
+    df["time"] = pd.date_range("1974-01-01", periods=len(df), freq="1min")
     out, units = _attach_earth_beam_separation(df, "radial-upper", "hours")
     assert units is None
     assert np.allclose(out["earth_beam_separation_deg"], [0.0, 180.0], atol=1e-3)

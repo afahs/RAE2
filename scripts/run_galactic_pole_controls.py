@@ -279,7 +279,7 @@ def main() -> None:
     parser.add_argument("--output-dir", default="outputs/quiet_galactic_poles_control_v1/04_fast_stack")
     parser.add_argument("--window-seconds", type=float, default=600.0)
     parser.add_argument("--bin-seconds", type=float, default=60.0)
-    parser.add_argument("--baseline-mode", default="sideband_linear")
+    parser.add_argument("--baseline-mode", default="joint_step_linear")
     parser.add_argument("--sideband-exclusion-seconds", type=float, default=120.0)
     args = parser.parse_args()
 

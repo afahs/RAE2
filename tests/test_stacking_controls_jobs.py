@@ -19,6 +19,7 @@ def _mini_data():
     times = pd.date_range("1974-01-01", periods=30, freq="1min")
     event_time = pd.Timestamp("1974-01-01 00:15:00")
     y = np.where(times < event_time, 10.0, 5.0)
+    y += 0.05 * np.sin(np.arange(len(times)))
     clean = pd.DataFrame({"time": times, "frequency_band": 1, "antenna": "rv1_coarse", "power": y, "is_valid": True})
     events = pd.DataFrame(
         [{"event_id": 0, "source_name": "x", "event_type": "disappearance", "predicted_event_time": event_time, "frequency_band": 1, "antenna": "rv1_coarse"}]

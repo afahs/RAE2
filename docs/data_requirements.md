@@ -50,6 +50,21 @@ The package maps RAE-2 bands to MHz as:
 These assumptions should be checked against the provenance of any CSV used for
 science-grade results.
 
+## Power quality policy
+
+Ingest now records `quality_policy_version=instrument_limits_v2`. Percentile
+high-power and jump flags are advisory: either can describe a real burst or
+occultation. Non-finite/nonpositive power, malformed geometry, duplicate times,
+and gap flags still invalidate samples. A known instrument saturation limit
+can be supplied as `IngestOptions(saturation_power=...)` or
+`validate_timeseries(..., saturation_power=...)`; no limit is inferred from
+the brightest observed sample. Quantile clipping in `strict_power_mask` is
+disabled by default and remains an explicit sensitivity option.
+
+Regenerate cleaned tables from the retained raw power before comparing the
+new policy with old results. Old `is_valid` masks cannot recover samples they
+previously rejected. Preserve the old tables for comparison.
+
 ## Minimal CSV Example
 
 ```csv

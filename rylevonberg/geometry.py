@@ -46,7 +46,11 @@ def moon_limb_angle_deg(
     """
     center = moon_center_direction(spacecraft_position_km)
     sep = angular_separation_deg(center, target_unit_vectors)
-    return sep - moon_angular_radius_deg(spacecraft_position_km, moon_radius_km)
+    limb = sep - moon_angular_radius_deg(spacecraft_position_km, moon_radius_km)
+    # Missing/corrupt orbit rows can place the spacecraft inside the Moon.
+    # Clipping asin(R/r) to 90 degrees would manufacture an occultation.
+    radius = np.linalg.norm(np.asarray(spacecraft_position_km, dtype=float), axis=-1)
+    return np.where(np.isfinite(radius) & (radius > float(moon_radius_km)), limb, np.nan)
 
 
 def visible_by_moon(spacecraft_position_km: np.ndarray, target_unit_vectors: np.ndarray) -> np.ndarray:
@@ -58,7 +62,11 @@ def earth_direction_from_spacecraft(
     earth_unit_vector_from_moon: np.ndarray,
     earth_moon_distance_km: float = EARTH_MOON_DISTANCE_KM,
 ) -> np.ndarray:
-    moon_to_earth = normalize_vectors(earth_unit_vector_from_moon) * float(earth_moon_distance_km)
+    """Subtract vectors already in the same axes; never pass raw archive TOD
+    directions with B1950 positions. Prefer frames.body_vectors_from_spacecraft
+    for observation data. Distance may be scalar or one value per sample.
+    """
+    moon_to_earth = normalize_vectors(earth_unit_vector_from_moon) * np.asarray(earth_moon_distance_km)[..., None]
     return normalize_vectors(moon_to_earth - np.asarray(spacecraft_position_km, dtype=float))
 
 
@@ -70,7 +78,7 @@ def earth_limb_angle_deg(
     earth_moon_distance_km: float = EARTH_MOON_DISTANCE_KM,
 ) -> np.ndarray:
     earth_dir = earth_direction_from_spacecraft(spacecraft_position_km, earth_unit_vector_from_moon, earth_moon_distance_km)
-    moon_to_earth = normalize_vectors(earth_unit_vector_from_moon) * float(earth_moon_distance_km)
+    moon_to_earth = normalize_vectors(earth_unit_vector_from_moon) * np.asarray(earth_moon_distance_km)[..., None]
     sc_to_earth = moon_to_earth - np.asarray(spacecraft_position_km, dtype=float)
     radius = np.degrees(np.arcsin(np.clip(float(earth_radius_km) / np.linalg.norm(sc_to_earth, axis=1), 0.0, 1.0)))
     return angular_separation_deg(earth_dir, target_unit_vectors) - radius

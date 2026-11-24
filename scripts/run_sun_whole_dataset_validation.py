@@ -75,7 +75,7 @@ def _stack_summary_fast(
     events: pd.DataFrame,
     window_s: float,
     source_label: str | None = None,
-    baseline_mode: str = "sideband_linear",
+    baseline_mode: str = "joint_step_linear",
     sideband_exclusion_seconds: float = 120.0,
 ) -> pd.DataFrame:
     """Compute template-stack summaries without materializing aligned profiles."""
@@ -268,7 +268,7 @@ def main() -> None:
     parser.add_argument("--force-plots", action="store_true", help="Regenerate review plots even if they already exist.")
     parser.add_argument("--skip-plots", action="store_true", help="Skip review plot generation.")
     parser.add_argument("--cache-cleaned", action="store_true", help="Write the full cleaned long table. This can require several GB.")
-    parser.add_argument("--baseline-mode", default="sideband_linear", choices=["linear_all", "constant_all", "sideband_linear", "sideband_constant", "joint_step_linear", "pre_event_anchor"])
+    parser.add_argument("--baseline-mode", default="joint_step_linear", choices=["linear_all", "constant_all", "sideband_linear", "sideband_constant", "joint_step_linear", "pre_event_anchor"])
     parser.add_argument("--sideband-exclusion-seconds", type=float, default=120.0)
     args = parser.parse_args()
 

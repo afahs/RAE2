@@ -22,7 +22,7 @@ sys.path.insert(0, str(ROOT))
 
 from rylevonberg.constants import EARTH_MOON_DISTANCE_KM, EARTH_UNIT_COLUMNS, SPACECRAFT_COLUMNS  # noqa: E402
 from rylevonberg.events import source_vectors_for_rows  # noqa: E402
-from rylevonberg.frames import body_unit_vectors_from_moon, offset_unit_vectors_tangent  # noqa: E402
+from rylevonberg.frames import body_unit_vectors_from_moon, body_unit_vectors_from_spacecraft, offset_unit_vectors_tangent  # noqa: E402
 from rylevonberg.geometry import earth_direction_from_spacecraft, find_limb_transitions, moon_limb_angle_deg, normalize_vectors  # noqa: E402
 from rylevonberg.util import datetime_ns, ensure_dir, robust_sigma  # noqa: E402
 
@@ -69,8 +69,10 @@ def location_integrity(clean: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]
     moon_to_sun_icrs = (sun.xyz - moon.xyz).to_value(u.km).T
     csv_moon_to_earth = normalize_vectors(sample[EARTH_UNIT_COLUMNS].to_numpy(dtype=float))
     spacecraft = sample[SPACECRAFT_COLUMNS].to_numpy(dtype=float)
-    pipeline_sc_to_earth = earth_direction_from_spacecraft(spacecraft, sample[EARTH_UNIT_COLUMNS].to_numpy(dtype=float))
-    astropy_sc_to_earth = normalize_vectors(moon_to_earth_icrs - spacecraft)
+    pipeline_sc_to_earth = body_unit_vectors_from_spacecraft("earth", times, spacecraft)
+    earth_rep = CartesianRepresentation(moon_to_earth_icrs.T * u.km)
+    earth_fk4 = SkyCoord(earth_rep, frame="icrs", obstime=t_ast).transform_to(FK4(equinox=Time("B1950")))
+    astropy_sc_to_earth = normalize_vectors(earth_fk4.cartesian.xyz.to_value(u.km).T - spacecraft)
 
     rep = CartesianRepresentation(
         moon_to_sun_icrs[:, 0] * u.km,
@@ -100,7 +102,7 @@ def location_integrity(clean: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]
             "n_samples": int(len(sample)),
         },
         {
-            "check": "pipeline_sc_to_earth_vs_astropy_sc_to_earth_icrs",
+            "check": "pipeline_sc_to_earth_vs_independent_same_frame_fk4",
             "median_sep_deg": float(np.nanmedian(sep_deg(pipeline_sc_to_earth, astropy_sc_to_earth))),
             "max_sep_deg": float(np.nanmax(sep_deg(pipeline_sc_to_earth, astropy_sc_to_earth))),
             "n_samples": int(len(sample)),

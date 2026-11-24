@@ -337,7 +337,7 @@ def main() -> None:
     parser.add_argument("--n-bootstrap", type=int, default=40)
     parser.add_argument("--gap-factor", type=float, default=3.0)
     parser.add_argument("--artifact-sigma", type=float, default=12.0)
-    parser.add_argument("--baseline-mode", default="sideband_linear", choices=["linear_all", "constant_all", "sideband_linear", "sideband_constant", "joint_step_linear", "pre_event_anchor"])
+    parser.add_argument("--baseline-mode", default="joint_step_linear", choices=["linear_all", "constant_all", "sideband_linear", "sideband_constant", "joint_step_linear", "pre_event_anchor"])
     parser.add_argument("--sideband-exclusion-seconds", type=float, default=120.0)
     args = parser.parse_args()
 

@@ -1,5 +1,10 @@
 #!/usr/bin/env python
-"""Build all-frequency event profile grids for before/after visual inspection."""
+"""Build legacy median profile grids for before/after visual inspection.
+
+New detection reviews should use ``build_occultograms.py``.  That script keeps
+individual events visible, folds disappearance/reappearance to a common sign,
+and places fixed time controls beside the predicted alignment.
+"""
 
 from __future__ import annotations
 

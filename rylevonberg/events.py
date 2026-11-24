@@ -5,14 +5,25 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from .constants import EARTH_UNIT_COLUMNS, SPACECRAFT_COLUMNS, add_frequency_mhz_column, frequency_mhz_for_band
-from .frames import body_unit_vectors_from_moon, fixed_source_unit_vector, offset_unit_vectors_tangent, repeated_unit_vector
-from .geometry import earth_direction_from_spacecraft, find_limb_transitions, moon_angular_radius_deg, moon_center_direction, moon_limb_angle_deg
+from .constants import GEOMETRY_VERSION, SPACECRAFT_COLUMNS, add_frequency_mhz_column, frequency_mhz_for_band
+from .frames import body_unit_vectors_from_spacecraft, fixed_source_unit_vector, offset_unit_vectors_tangent, repeated_unit_vector
+from .geometry import find_limb_transitions, moon_angular_radius_deg, moon_center_direction, moon_limb_angle_deg
 from .util import datetime_ns
 
 
 def spacecraft_positions(df: pd.DataFrame) -> np.ndarray:
     return df[SPACECRAFT_COLUMNS].to_numpy(dtype=float)
+
+
+def event_cache_matches(events: pd.DataFrame) -> bool:
+    """Old predicted events and Earth-dependent cuts must be regenerated."""
+    return bool(not events.empty and "geometry_version" in events
+                and events["geometry_version"].eq(GEOMETRY_VERSION).all())
+
+
+def require_current_geometry(events: pd.DataFrame) -> None:
+    if not events.empty and not event_cache_matches(events):
+        raise ValueError("Stale event geometry: rerun predict with independent body ephemerides before detection, stacking or controls")
 
 
 def _append_flag_text(flags: str, flag: str) -> str:
@@ -76,17 +87,17 @@ def source_vectors_for_rows(
         return repeated_unit_vector(vec, len(times))
     if kind == "body":
         body = str(source.get("body_name", "") or source["source_name"]).lower()
-        return body_unit_vectors_from_moon(body, times, target_frame=target_frame, equinox=equinox, ephemeris=ephemeris)
+        return body_unit_vectors_from_spacecraft(body, times, spacecraft_positions(data_df), target_frame=target_frame, equinox=equinox, ephemeris=ephemeris)
     if kind == "body_offset":
         body = str(source.get("body_name", "") or source["source_name"]).lower()
-        real = body_unit_vectors_from_moon(body, times, target_frame=target_frame, equinox=equinox, ephemeris=ephemeris)
+        real = body_unit_vectors_from_spacecraft(body, times, spacecraft_positions(data_df), target_frame=target_frame, equinox=equinox, ephemeris=ephemeris)
         return offset_unit_vectors_tangent(
             real,
             east_offset_deg=float(source.get("offset_east_deg", 0.0) or 0.0),
             north_offset_deg=float(source.get("offset_north_deg", 0.0) or 0.0),
         )
     if kind == "earth":
-        return earth_direction_from_spacecraft(spacecraft_positions(data_df), data_df[EARTH_UNIT_COLUMNS].to_numpy(dtype=float))
+        return body_unit_vectors_from_spacecraft("earth", times, spacecraft_positions(data_df), target_frame=target_frame, equinox=equinox, ephemeris=ephemeris)
     raise ValueError(f"Unsupported source kind: {kind}")
 
 
@@ -123,6 +134,10 @@ def predict_source_events(
             "limb_angle_deg": limb,
             "moon_angular_radius_deg": moon_angular_radius_deg(sc),
             "visible_by_moon": limb >= 0.0,
+            "geometry_version": GEOMETRY_VERSION,
+            "geometry_frame": target_frame,
+            "geometry_equinox": equinox,
+            "geometry_ephemeris": ephemeris,
         }
     )
     transitions = find_limb_transitions(times, limb, max_gap_seconds=max_gap_seconds)
@@ -187,6 +202,10 @@ def predict_source_events(
                         "limb_exclusion_nearest_abs_deg": nearest_abs,
                         "limb_exclusion_source_angles_deg": exclusion_metadata,
                         "quality_flags": quality_flags,
+                        "geometry_version": GEOMETRY_VERSION,
+                        "geometry_frame": target_frame,
+                        "geometry_equinox": equinox,
+                        "geometry_ephemeris": ephemeris,
                     }
                 )
     return add_frequency_mhz_column(pd.DataFrame.from_records(rows)), state

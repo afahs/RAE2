@@ -275,7 +275,7 @@ def _event_type_profile(clean: pd.DataFrame, events: pd.DataFrame, source_summar
             tr,
             yy,
             str(ev["event_type"]),
-            baseline_mode="sideband_linear",
+            baseline_mode="joint_step_linear",
             sideband_exclusion_seconds=120.0,
             timing_offset_sec=timing_offset,
             normalize=True,
@@ -343,7 +343,7 @@ def _plot_event_type_profile(source: str, clean: pd.DataFrame, events: pd.DataFr
         f"{_antenna_label(source_summary['target_antenna'])} profile"
     )
     ax.set_xlabel("Relative time from predicted event (min)")
-    ax.set_ylabel("Mean normalized sideband residual")
+    ax.set_ylabel("Mean normalized baseline-subtracted profile")
     ax.legend(fontsize=8)
     return _save(fig, out / source / f"{source}_best_channel_event_type_profile.png")
 
@@ -354,7 +354,7 @@ def _write_readme(out: Path, summary_path: Path, paths: dict[str, list[Path]], s
         "",
         f"Generated from `{summary_path}`.",
         "",
-        "These plots use the updated sideband-linear profile baseline and robust stack SNR where available.",
+        "These plots use the joint step-plus-linear profile baseline and robust stack SNR where available.",
         "Neighboring frequency bands are labeled as spectral support, not wrong-band controls.",
         "",
     ]

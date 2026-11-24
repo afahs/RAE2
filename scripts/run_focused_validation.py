@@ -30,7 +30,8 @@ from rylevonberg.source_summary import (
     final_source_summary,
 )
 from rylevonberg.sources import filter_sources, load_source_list
-from rylevonberg.stacking import aligned_profiles, randomized_stack_distribution, stack_profiles
+from rylevonberg.ingest import validate_timeseries
+from rylevonberg.stacking import aligned_profiles, randomized_stack_distribution, stack_profiles, stack_cache_matches
 from rylevonberg.util import ensure_dir, write_json
 
 
@@ -175,7 +176,7 @@ def _load_or_build_randomized_stacks(
     if path.exists() and not force:
         cached = _read_csv(path)
         required = {"control_id", "n_input_events", "stacked_snr"}
-        if required.issubset(cached.columns) and cached["control_id"].nunique() >= int(n_random):
+        if required.issubset(cached.columns) and cached["control_id"].nunique() >= int(n_random) and stack_cache_matches(cached, window_s):
             return cached
     out = randomized_stack_distribution(
         clean,
@@ -205,7 +206,8 @@ def _generate_cyg_offsource(
     if events_path.exists() and not args.force_cyg_predict:
         cached = _read_csv(events_path, parse_dates=["predicted_event_time"])
         required = {"source_name", "predicted_event_time", "frequency_band", "antenna", "parent_source"}
-        if required.issubset(cached.columns):
+        from rylevonberg.events import event_cache_matches
+        if required.issubset(cached.columns) and event_cache_matches(cached):
             return cached
     events, states = predict_events(
         clean,
@@ -244,7 +246,9 @@ def _offsource_stacks(
         required = {"source_name", "parent_source", "frequency_band", "antenna", "window_s", "stacked_snr"}
         if required.issubset(cached.columns):
             cached_windows = set(pd.to_numeric(cached["window_s"], errors="coerce").dropna())
-            if set(float(value) for value in windows).issubset(cached_windows):
+            if set(float(value) for value in windows).issubset(cached_windows) and all(
+                stack_cache_matches(cached[cached["window_s"].eq(w)], w) for w in windows
+            ):
                 return cached[cached["window_s"].isin(windows)].reset_index(drop=True)
     for window in windows:
         profiles = aligned_profiles(clean, off_events, window_seconds=window, bin_seconds=60.0)
@@ -277,7 +281,8 @@ def _earth_report(
     profiles = _read_csv(earth_root / "04_stack" / "event_aligned_profiles.csv", parse_dates=["predicted_event_time"])
     earth_events = events[events["source_name"].eq("earth")].reset_index(drop=True)
     earth_scored = scored[scored["source_name"].eq("earth")].reset_index(drop=True)
-    earth_stack = stack_summary[stack_summary["source_name"].eq("earth")].reset_index(drop=True)
+    profiles = aligned_profiles(clean, earth_events, window_seconds=600., bin_seconds=60.)
+    _, earth_stack = stack_profiles(profiles, n_bootstrap=50)
     quality = event_window_quality(clean, earth_events, 600.0)
     block = block_jackknife_from_profiles(profiles[profiles["source_name"].eq("earth")])
     report_dir = ensure_dir(out_reports / "earth_positive_control_assets")
@@ -364,7 +369,8 @@ def _sun_report(
     profiles = _read_csv(earth_root / "04_stack" / "event_aligned_profiles.csv", parse_dates=["predicted_event_time"])
     sun_events = events[events["source_name"].eq("sun")].reset_index(drop=True)
     sun_scored = scored[scored["source_name"].eq("sun")].reset_index(drop=True)
-    sun_stack = stack_summary[stack_summary["source_name"].eq("sun")].reset_index(drop=True)
+    profiles = aligned_profiles(clean, sun_events, window_seconds=600., bin_seconds=60.)
+    _, sun_stack = stack_profiles(profiles, n_bootstrap=50)
     quality = event_window_quality(clean, sun_events, 600.0)
     block = block_jackknife_from_profiles(profiles[profiles["source_name"].eq("sun")])
     source_level = aggregate_source_level(sun_events, sun_scored, sun_stack, quality, block, window_s=600.0)
@@ -615,6 +621,7 @@ def main() -> None:
     out_reports = ensure_dir("outputs/reports")
     ensure_dir("outputs/summary")
     clean = _read_csv(args.cleaned, parse_dates=["time"])
+    clean, _ = validate_timeseries(clean)
     sources = load_source_list(args.sources)
     off_events = _generate_cyg_offsource(clean, sources, out_root, args)
     off_summary = _offsource_stacks(

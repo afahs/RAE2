@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from rylevonberg.constants import EARTH_UNIT_COLUMNS, SPACECRAFT_COLUMNS  # noqa: E402
-from rylevonberg.geometry import earth_direction_from_spacecraft  # noqa: E402
+from rylevonberg.frames import body_unit_vectors_from_spacecraft  # noqa: E402
 from rylevonberg.util import ensure_dir, software_versions, write_json  # noqa: E402
 
 from scripts.build_all_frequency_occultation_profile_grids import (  # noqa: E402
@@ -45,7 +45,7 @@ def _earth_galactic_b_for_events(events: pd.DataFrame, clean_path: Path) -> pd.D
         .reset_index(drop=True)
     )
     unique["predicted_event_time"] = pd.to_datetime(unique["predicted_event_time"], errors="coerce").astype("datetime64[ns]")
-    usecols = ["time", *SPACECRAFT_COLUMNS, *EARTH_UNIT_COLUMNS]
+    usecols = ["time", *SPACECRAFT_COLUMNS]
     geom = read_table(clean_path, usecols=usecols, parse_dates=["time"], low_memory=False)
     geom["time"] = pd.to_datetime(geom["time"], errors="coerce").astype("datetime64[ns]")
     geom = geom.dropna(subset=["time"]).drop_duplicates("time").sort_values("time").reset_index(drop=True)
@@ -61,10 +61,7 @@ def _earth_galactic_b_for_events(events: pd.DataFrame, clean_path: Path) -> pd.D
     if missing.any():
         raise RuntimeError(f"Could not match {int(missing.sum())} Earth events to cleaned geometry within 5 minutes")
 
-    earth_vec = earth_direction_from_spacecraft(
-        matched[SPACECRAFT_COLUMNS].to_numpy(dtype=float),
-        matched[EARTH_UNIT_COLUMNS].to_numpy(dtype=float),
-    )
+    earth_vec = body_unit_vectors_from_spacecraft("earth", matched["time"], matched[SPACECRAFT_COLUMNS].to_numpy(dtype=float))
     rep = CartesianRepresentation(earth_vec[:, 0] * u.one, earth_vec[:, 1] * u.one, earth_vec[:, 2] * u.one)
     gal = SkyCoord(rep, frame=FK4(equinox=Time("B1950"))).galactic
     matched["earth_galactic_l_deg"] = np.asarray(gal.l.deg, dtype=float)

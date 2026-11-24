@@ -12,7 +12,8 @@ def test_strict_power_mask_rejects_invalid_power_but_not_normal_plateau() -> Non
     assert strict_power_mask(normal).all()
 
     bad = pd.DataFrame({"power": [10.0] * 20 + [0.0, -1.0, np.nan, 1.0e9], "is_valid": [True] * 24})
-    masked = add_strict_valid_column(bad)
+    # High-amplitude clipping is now an explicit sensitivity option.
+    masked = add_strict_valid_column(bad, upper_clip_quantile=0.9999)
     assert not bool(masked.loc[20, "strict_is_valid"])
     assert not bool(masked.loc[21, "strict_is_valid"])
     assert not bool(masked.loc[22, "strict_is_valid"])
@@ -27,6 +28,7 @@ def test_stepfit_uses_strict_mask_for_stale_clean_files() -> None:
     y[19] = 0.0
     y[21] = 1.0e9
     clean = pd.DataFrame({"time": times, "frequency_band": 1, "antenna": "rv1_coarse", "power": y, "is_valid": True})
+    clean.loc[21, "is_valid"] = False  # externally confirmed bad telemetry
     events = pd.DataFrame(
         [{"event_id": 0, "source_name": "x", "event_type": "disappearance", "predicted_event_time": event_time, "frequency_band": 1, "antenna": "rv1_coarse"}]
     )

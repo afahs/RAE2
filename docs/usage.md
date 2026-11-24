@@ -77,6 +77,35 @@ python -m rylevonberg.pipeline score-detections \
 
 ## Interactive HPC Use
 
+### Source-preserving processing (October 2026)
+
+Stacking defaults to `joint_step_linear`: fit the predicted step alongside a
+linear baseline, then remove only the baseline. The old `sideband_linear`
+and `linear_all` modes remain explicit diagnostic options; both can attenuate
+an occultation. Target, off-source, and randomized stacks must use the same
+baseline and sample mask. Ordinary and accelerated stacks now share their
+extraction path. Summaries carry processing-version and window metadata;
+focused validation rejects legacy control caches and rebuilds target stacks.
+The stack score estimates its noise from the fitted residual, so the recovered
+source amplitude is not counted as noise. It remains an empirical score that
+needs matched controls, not a Gaussian significance for correlated samples.
+
+Occultograms retain raw profiles when a sideband is flat or has too few
+samples. Those rows have NaN normalized power and an explicit
+`normalization_status` in event metadata. Summary counts distinguish usable
+raw events from normalized events. A missing normalized profile is not a
+non-detection of raw structure.
+
+The solar analysis uses explicit nanosecond conversion for all timestamp
+arithmetic and refreshes quality flags for its strict treatment.
+
+For a paired real-background sensitivity experiment, use
+`scripts/run_end_to_end_sensitivity.py --help`. It requires an untouched
+pre-fix package, the mission master CSV, and retained event tables. It injects
+before validation and estimates each pipeline's threshold from independent
+uninjected calibration days; evaluate the held-out false-positive rate along
+with recovery. Its window-local trial is not a full-mission source regrade.
+
 The package has an explicit guard against batch-mode execution. On an HPC
 system, request an interactive allocation first:
 

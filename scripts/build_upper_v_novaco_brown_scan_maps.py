@@ -49,7 +49,7 @@ from rylevonberg.constants import (  # noqa: E402
     MOON_RADIUS_KM,
     SPACECRAFT_COLUMNS,
 )
-from rylevonberg.frames import body_unit_vectors_from_moon  # noqa: E402
+from rylevonberg.frames import body_unit_vectors_from_moon, body_unit_vectors_from_spacecraft  # noqa: E402
 from rylevonberg.geometry import normalize_vectors  # noqa: E402
 from rylevonberg.table_io import read_table  # noqa: E402
 from rylevonberg.util import datetime_ns, ensure_dir, robust_sigma, software_versions, write_json  # noqa: E402
@@ -61,7 +61,7 @@ NOVACO_BROWN_BANDS = [4, 5, 6, 7, 8, 9]
 SYNODIC_MONTH_DAYS = 29.530588853
 REFERENCE_NEW_MOON = pd.Timestamp("1970-01-07 20:35:00")
 UNCOVERED_CMAP = ListedColormap([(0.70, 0.70, 0.70, 0.62)])
-EARTH_BEAM_GEOMETRY_COLUMNS = [*SPACECRAFT_COLUMNS, *EARTH_UNIT_COLUMNS]
+EARTH_BEAM_GEOMETRY_COLUMNS = [*SPACECRAFT_COLUMNS]
 BEAM_DIR = Path(os.environ.get("RAE2_ANTENNA_DIGITIZATION_DIR", "data/antennaDigitization"))
 BEAM_SPECS = [
     (1.31, BEAM_DIR / "eplane_1p31MHz.csv", BEAM_DIR / "hplane_1p31MHz.csv"),
@@ -242,15 +242,14 @@ def sun_unit_vectors_for_times(
 
 
 def _earth_direction_vectors(df: pd.DataFrame) -> np.ndarray:
-    missing = [col for col in EARTH_BEAM_GEOMETRY_COLUMNS if col not in df.columns]
+    missing = [col for col in ["time", *EARTH_BEAM_GEOMETRY_COLUMNS] if col not in df.columns]
     if missing:
         raise ValueError(
             "Earth-beam selection requires geometry columns missing from input: "
             + ", ".join(missing)
         )
     spacecraft = df[SPACECRAFT_COLUMNS].to_numpy(dtype=float)
-    moon_to_earth = normalize_vectors(df[EARTH_UNIT_COLUMNS].to_numpy(dtype=float)) * float(EARTH_MOON_DISTANCE_KM)
-    return normalize_vectors(moon_to_earth - spacecraft)
+    return body_unit_vectors_from_spacecraft("earth", df["time"], spacecraft)
 
 
 def _beam_axis_vectors(df: pd.DataFrame, axis_mode: str, ra_units: str) -> tuple[np.ndarray, str | None]:

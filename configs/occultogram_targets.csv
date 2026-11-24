@@ -1,0 +1,12 @@
+source_name,target_class,default_include,priority,rationale
+earth,positive_control,true,1,Validated visual occultation control; interpret intermediate Galaxy-dominated bands separately
+sun,solar,true,2,Use morphology and burst-aware interpretation; do not claim from a continuum SNR alone
+fornax_a,extrasolar,true,3,High Galactic latitude and farther from the Galactic center than Cas A or Cyg A
+vir_a,extrasolar,true,4,Very high Galactic latitude; useful foreground discriminator despite weaker expected flux
+cas_a,extrasolar,false,5,Very bright but close to the Galactic plane and therefore foreground-confused
+cyg_a,extrasolar,false,6,Very bright but close to the Galactic plane and therefore foreground-confused
+tau_a,extrasolar,false,7,Close to the Galactic plane and foreground-confused
+jupiter,outer_planet,false,8,Bursty emission; analyze event heatmaps alongside Io-phase burst diagnostics
+saturn,outer_planet,false,9,Exploratory occultogram or upper limit rather than an expected continuum detection
+uranus,outer_planet,false,10,Exploratory occultogram or upper limit rather than an expected continuum detection
+neptune,outer_planet,false,11,Exploratory occultogram or upper limit rather than an expected continuum detection

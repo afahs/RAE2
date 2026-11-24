@@ -188,8 +188,8 @@ def attach_edge_diffraction(samples: pd.DataFrame) -> pd.DataFrame:
         return samples
     out = samples.copy()
     spacecraft = out[SPACECRAFT_COLUMNS].to_numpy(dtype=float)
-    source_unit = out[EARTH_UNIT_COLUMNS].to_numpy(dtype=float)
-    source = source_unit * EARTH_MOON_DISTANCE_KM
+    from rylevonberg.frames import body_positions_from_moon
+    source = body_positions_from_moon("earth", out["time"])
     ray = source - spacecraft
     ray2 = np.einsum("ij,ij->i", ray, ray)
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -520,9 +520,13 @@ def incorrect_geometry_audit(samples: pd.DataFrame, seed: int) -> pd.DataFrame:
     fit_samples = _fit_sample_gate(samples)
     if fit_samples.empty:
         return pd.DataFrame()
+    from rylevonberg.frames import body_positions_from_moon
+    moon_to_earth = body_positions_from_moon("earth", fit_samples["time"])
+    distance = np.linalg.norm(moon_to_earth, axis=1)
     delta_km, valid = tangent_proxy_path_km(
         fit_samples[SPACECRAFT_COLUMNS].to_numpy(dtype=float),
-        fit_samples[EARTH_UNIT_COLUMNS].to_numpy(dtype=float),
+        moon_to_earth / distance[:, None],
+        earth_moon_distance_km=distance,
     )
     fit_samples["phase_rad"] = 2.0 * np.pi * delta_km / wavelength_km(
         fit_samples["frequency_mhz"].to_numpy(dtype=float)

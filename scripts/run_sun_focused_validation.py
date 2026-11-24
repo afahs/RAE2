@@ -32,7 +32,8 @@ from rylevonberg.source_summary import (
     block_jackknife_from_profiles,
     final_source_summary,
 )
-from rylevonberg.stacking import fast_stack_summary, randomized_stack_distribution, stack_profiles
+from rylevonberg.ingest import validate_timeseries
+from rylevonberg.stacking import aligned_profiles, fast_stack_summary, randomized_stack_distribution, stack_profiles, stack_cache_matches
 from rylevonberg.util import ensure_dir, write_json
 
 
@@ -156,6 +157,7 @@ def main() -> None:
     ensure_dir("outputs/summary")
 
     clean = _read_csv(args.cleaned, parse_dates=["time"])
+    clean, _ = validate_timeseries(clean)
     root = Path(args.earth_sun_root)
     events = _read_csv(root / "02_events" / "predicted_events.csv", parse_dates=["predicted_event_time"])
     scored = _read_csv(root / "07_scoring" / "scored_detections.csv", parse_dates=["predicted_event_time"])
@@ -164,8 +166,8 @@ def main() -> None:
 
     sun_events = events[events["source_name"].eq("sun")].reset_index(drop=True)
     sun_scored = scored[scored["source_name"].eq("sun")].reset_index(drop=True)
-    sun_stack = stack_summary[stack_summary["source_name"].eq("sun")].reset_index(drop=True)
-    sun_profiles = profiles[profiles["source_name"].eq("sun")].reset_index(drop=True)
+    sun_profiles = aligned_profiles(clean, sun_events, window_seconds=args.window, bin_seconds=60.)
+    _, sun_stack = stack_profiles(sun_profiles, n_bootstrap=50)
 
     controls = generate_moving_body_offset_controls(
         MovingBodyOffsetConfig(
@@ -214,7 +216,7 @@ def main() -> None:
     if randomized_path.exists() and not args.force_randomized_stacks:
         cached = _read_csv(randomized_path)
         required = {"control_id", "n_input_events", "stacked_snr"}
-        if required.issubset(cached.columns) and cached["control_id"].nunique() >= int(args.n_random_stack_controls):
+        if required.issubset(cached.columns) and cached["control_id"].nunique() >= int(args.n_random_stack_controls) and stack_cache_matches(cached, args.window):
             randomized_stack = cached
     if randomized_stack.empty:
         randomized_stack = randomized_stack_distribution(

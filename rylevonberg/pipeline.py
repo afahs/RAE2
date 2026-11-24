@@ -11,8 +11,8 @@ from .blind import blind_changepoints, cluster_blind_constraints
 from .bursts import search_burst_events
 from .controls import injection_recovery, injection_recovery_grid, negative_control_event_ensemble, randomized_event_times, subsample_control_events, time_reversed_events
 from .detection import StepFitConfig, run_matched_filter, run_stepfit_detections
-from .events import predict_events
-from .ingest import IngestOptions, ingest_csv
+from .events import predict_events, require_current_geometry
+from .ingest import IngestOptions, ingest_csv, require_current_quality
 from .jobs import require_interactive_mode
 from .plotting import plot_event_window, plot_stack
 from .reporting import write_control_validation_report, write_methodology_report
@@ -32,6 +32,12 @@ def _list_arg(values: list[str] | None) -> list[str] | None:
     return out or None
 
 
+def _read_current_cleaned(path: str | Path) -> pd.DataFrame:
+    clean = read_table(path, parse_dates=["time"])
+    require_current_quality(clean)
+    return clean
+
+
 def cmd_ingest(args: argparse.Namespace) -> dict[str, str]:
     require_interactive_mode(args.run_mode)
     out = ensure_dir(args.output_dir)
@@ -43,6 +49,7 @@ def cmd_ingest(args: argparse.Namespace) -> dict[str, str]:
             value_columns=tuple(args.value_columns),
             gap_factor=args.gap_factor,
             artifact_sigma=args.artifact_sigma,
+            saturation_power=getattr(args, "saturation_power", None),
         ),
     )
     clean_path = out / "cleaned_timeseries.csv"
@@ -56,7 +63,7 @@ def cmd_ingest(args: argparse.Namespace) -> dict[str, str]:
 def cmd_predict(args: argparse.Namespace) -> dict[str, str]:
     require_interactive_mode(args.run_mode)
     out = ensure_dir(args.output_dir)
-    clean = read_table(args.cleaned, parse_dates=["time"])
+    clean = _read_current_cleaned(args.cleaned)
     source_table = load_source_list(args.sources)
     sources = filter_sources(source_table, _list_arg(args.source))
     limb_exclusion_names = _list_arg(getattr(args, "exclude_limb_source", None))
@@ -87,8 +94,9 @@ def cmd_predict(args: argparse.Namespace) -> dict[str, str]:
 def cmd_detect(args: argparse.Namespace) -> dict[str, str]:
     require_interactive_mode(args.run_mode)
     out = ensure_dir(args.output_dir)
-    clean = read_table(args.cleaned, parse_dates=["time"])
+    clean = _read_current_cleaned(args.cleaned)
     events = read_table(args.events, parse_dates=["predicted_event_time"])
+    require_current_geometry(events)
     config = StepFitConfig(
         window_seconds=args.window_seconds,
         baseline_order=args.baseline_order,
@@ -113,14 +121,15 @@ def cmd_detect(args: argparse.Namespace) -> dict[str, str]:
 def cmd_stack(args: argparse.Namespace) -> dict[str, str]:
     require_interactive_mode(args.run_mode)
     out = ensure_dir(args.output_dir)
-    clean = read_table(args.cleaned, parse_dates=["time"])
+    clean = _read_current_cleaned(args.cleaned)
     events = read_table(args.events, parse_dates=["predicted_event_time"])
+    require_current_geometry(events)
     profiles = aligned_profiles(
         clean,
         events,
         window_seconds=args.window_seconds,
         bin_seconds=args.bin_seconds,
-        baseline_mode=getattr(args, "baseline_mode", "sideband_linear"),
+        baseline_mode=getattr(args, "baseline_mode", "joint_step_linear"),
         sideband_exclusion_seconds=getattr(args, "sideband_exclusion_seconds", 120.0),
     )
     stacked, summary = stack_profiles(profiles, n_bootstrap=args.bootstrap)
@@ -138,7 +147,7 @@ def cmd_stack(args: argparse.Namespace) -> dict[str, str]:
 def cmd_blind(args: argparse.Namespace) -> dict[str, str]:
     require_interactive_mode(args.run_mode)
     out = ensure_dir(args.output_dir)
-    clean = read_table(args.cleaned, parse_dates=["time"])
+    clean = _read_current_cleaned(args.cleaned)
     candidates = blind_changepoints(clean, window_samples=args.window_samples, snr_threshold=args.snr_threshold)
     clusters = cluster_blind_constraints(candidates)
     cand_path = out / "blind_candidate_event_catalog.csv"
@@ -151,8 +160,9 @@ def cmd_blind(args: argparse.Namespace) -> dict[str, str]:
 def cmd_burst_search(args: argparse.Namespace) -> dict[str, str]:
     require_interactive_mode(args.run_mode)
     out = ensure_dir(args.output_dir)
-    clean = read_table(args.cleaned, parse_dates=["time"])
+    clean = _read_current_cleaned(args.cleaned)
     events = read_table(args.events, parse_dates=["predicted_event_time"])
+    require_current_geometry(events)
     bursts = search_burst_events(
         clean,
         events,
@@ -169,8 +179,9 @@ def cmd_burst_search(args: argparse.Namespace) -> dict[str, str]:
 def cmd_validate(args: argparse.Namespace) -> dict[str, str]:
     require_interactive_mode(args.run_mode)
     out = ensure_dir(args.output_dir)
-    clean = read_table(args.cleaned, parse_dates=["time"])
+    clean = _read_current_cleaned(args.cleaned)
     events = read_table(args.events, parse_dates=["predicted_event_time"])
+    require_current_geometry(events)
     config = StepFitConfig(window_seconds=args.window_seconds, smooth_seconds=args.smooth_seconds)
     amp = [float(v) for v in args.amplitudes]
     inj = injection_recovery(clean, events, amp, config)
@@ -213,10 +224,12 @@ def cmd_validate(args: argparse.Namespace) -> dict[str, str]:
 def cmd_score(args: argparse.Namespace) -> dict[str, str]:
     require_interactive_mode(args.run_mode)
     out = ensure_dir(args.output_dir)
-    clean = read_table(args.cleaned, parse_dates=["time"])
+    clean = _read_current_cleaned(args.cleaned)
     real_step = read_table(args.stepfit, parse_dates=["predicted_event_time"])
     real_matched = read_table(args.matched, parse_dates=["predicted_event_time"])
     controls = read_table(args.control_events, parse_dates=["predicted_event_time"])
+    for table in (real_step, real_matched, controls):
+        require_current_geometry(table)
     injection_grid = read_table(args.injection_grid) if args.injection_grid else None
     cfg = ScoreConfig(
         window_seconds=args.window_seconds,
@@ -300,7 +313,7 @@ def cmd_run_smoke(args: argparse.Namespace) -> dict[str, str]:
         window_seconds=args.window_seconds,
         bin_seconds=60.0,
         bootstrap=50,
-        baseline_mode=getattr(args, "baseline_mode", "sideband_linear"),
+        baseline_mode=getattr(args, "baseline_mode", "joint_step_linear"),
         sideband_exclusion_seconds=getattr(args, "sideband_exclusion_seconds", 120.0),
         plots=True,
         run_mode=args.run_mode,
@@ -361,6 +374,7 @@ def cmd_run_control_survey(args: argparse.Namespace) -> dict[str, str]:
         value_columns=args.value_columns,
         gap_factor=args.gap_factor,
         artifact_sigma=args.artifact_sigma,
+        saturation_power=getattr(args, "saturation_power", None),
         run_mode=args.run_mode,
     )
     outputs.update(cmd_ingest(ingest_args))
@@ -502,6 +516,7 @@ def build_parser() -> argparse.ArgumentParser:
     common_io(sp)
     sp.add_argument("--gap-factor", type=float, default=3.0)
     sp.add_argument("--artifact-sigma", type=float, default=12.0)
+    sp.add_argument("--saturation-power", type=float, default=None, help="Known instrument saturation limit; no amplitude-derived limit by default.")
     sp.set_defaults(func=cmd_ingest)
 
     sp = sub.add_parser("predict")
@@ -543,7 +558,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--bin-seconds", type=float, default=30.0)
     sp.add_argument("--bootstrap", type=int, default=200)
     sp.add_argument("--max-stack-events-per-group", type=int, default=200)
-    sp.add_argument("--baseline-mode", default="sideband_linear", choices=["linear_all", "constant_all", "sideband_linear", "sideband_constant", "joint_step_linear", "pre_event_anchor"])
+    sp.add_argument("--baseline-mode", default="joint_step_linear", choices=["linear_all", "constant_all", "sideband_linear", "sideband_constant", "joint_step_linear", "pre_event_anchor"])
     sp.add_argument("--sideband-exclusion-seconds", type=float, default=120.0)
     sp.add_argument("--plots", action="store_true")
     common_run(sp)
@@ -637,7 +652,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--smooth-seconds", type=float, default=0.0)
     sp.add_argument("--timing-offsets", nargs="+", type=float, default=[-120.0, -60.0, -30.0, 0.0, 30.0, 60.0, 120.0])
     sp.add_argument("--stack-bin-seconds", type=float, default=60.0)
-    sp.add_argument("--baseline-mode", default="sideband_linear", choices=["linear_all", "constant_all", "sideband_linear", "sideband_constant", "joint_step_linear", "pre_event_anchor"])
+    sp.add_argument("--baseline-mode", default="joint_step_linear", choices=["linear_all", "constant_all", "sideband_linear", "sideband_constant", "joint_step_linear", "pre_event_anchor"])
     sp.add_argument("--sideband-exclusion-seconds", type=float, default=120.0)
     sp.add_argument("--bootstrap", type=int, default=200)
     sp.add_argument("--max-stack-events-per-group", type=int, default=200)
@@ -660,6 +675,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--blind-snr-threshold", type=float, default=8.0)
     sp.add_argument("--gap-factor", type=float, default=3.0)
     sp.add_argument("--artifact-sigma", type=float, default=12.0)
+    sp.add_argument("--saturation-power", type=float, default=None, help="Known instrument saturation limit; no amplitude-derived limit by default.")
     sp.set_defaults(func=cmd_run_control_survey, start="1974-11-01 00:00:00", end="1976-01-02 00:00:00")
     return p
 

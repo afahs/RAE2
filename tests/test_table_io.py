@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 from rylevonberg.table_io import read_table, resolve_table_path, write_table
 
@@ -37,3 +38,24 @@ def test_read_table_npy_usecols_and_chunks(tmp_path):
     chunks = list(read_table(path, chunksize=2))
     assert [len(chunk) for chunk in chunks] == [2, 1]
     assert chunks[0]["a"].tolist() == [1, 2]
+
+
+def test_parquet_round_trip_and_sidecar_preference(tmp_path):
+    pytest.importorskip("pyarrow")
+    df = pd.DataFrame(
+        {
+            "source_name": ["earth", "earth", "sun"],
+            "event_id": [1, 2, 3],
+            "power": [10.5, 11.5, 12.5],
+        }
+    )
+    parquet_path = tmp_path / "large_table.parquet"
+    csv_path = tmp_path / "large_table.csv"
+    write_table(df, parquet_path)
+
+    assert resolve_table_path(csv_path) == parquet_path
+    loaded = read_table(csv_path, usecols=["source_name", "power"])
+    assert loaded.to_dict(orient="list") == {
+        "source_name": ["earth", "earth", "sun"],
+        "power": [10.5, 11.5, 12.5],
+    }
